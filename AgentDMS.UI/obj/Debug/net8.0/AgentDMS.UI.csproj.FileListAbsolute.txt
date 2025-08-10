@@ -16,13 +16,7 @@
 /home/runner/work/agentdms/agentdms/AgentDMS.UI/bin/Debug/net8.0/itext.svg.dll
 /home/runner/work/agentdms/agentdms/AgentDMS.UI/bin/Debug/net8.0/itext.commons.dll
 /home/runner/work/agentdms/agentdms/AgentDMS.UI/bin/Debug/net8.0/Microsoft.DotNet.PlatformAbstractions.dll
-/home/runner/work/agentdms/agentdms/AgentDMS.UI/bin/Debug/net8.0/Microsoft.Extensions.DependencyInjection.dll
-/home/runner/work/agentdms/agentdms/AgentDMS.UI/bin/Debug/net8.0/Microsoft.Extensions.DependencyInjection.Abstractions.dll
 /home/runner/work/agentdms/agentdms/AgentDMS.UI/bin/Debug/net8.0/Microsoft.Extensions.DependencyModel.dll
-/home/runner/work/agentdms/agentdms/AgentDMS.UI/bin/Debug/net8.0/Microsoft.Extensions.Logging.dll
-/home/runner/work/agentdms/agentdms/AgentDMS.UI/bin/Debug/net8.0/Microsoft.Extensions.Logging.Abstractions.dll
-/home/runner/work/agentdms/agentdms/AgentDMS.UI/bin/Debug/net8.0/Microsoft.Extensions.Options.dll
-/home/runner/work/agentdms/agentdms/AgentDMS.UI/bin/Debug/net8.0/Microsoft.Extensions.Primitives.dll
 /home/runner/work/agentdms/agentdms/AgentDMS.UI/bin/Debug/net8.0/Microsoft.Win32.SystemEvents.dll
 /home/runner/work/agentdms/agentdms/AgentDMS.UI/bin/Debug/net8.0/Newtonsoft.Json.dll
 /home/runner/work/agentdms/agentdms/AgentDMS.UI/bin/Debug/net8.0/SixLabors.Fonts.dll
@@ -49,3 +43,13 @@
 /home/runner/work/agentdms/agentdms/AgentDMS.UI/obj/Debug/net8.0/AgentDMS.UI.pdb
 /home/runner/work/agentdms/agentdms/AgentDMS.UI/obj/Debug/net8.0/AgentDMS.UI.genruntimeconfig.cache
 /home/runner/work/agentdms/agentdms/AgentDMS.UI/obj/Debug/net8.0/ref/AgentDMS.UI.dll
+/home/runner/work/agentdms/agentdms/AgentDMS.UI/bin/Debug/net8.0/AgentDMS.UI.staticwebassets.runtime.json
+/home/runner/work/agentdms/agentdms/AgentDMS.UI/obj/Debug/net8.0/AgentDMS.UI.MvcApplicationPartsAssemblyInfo.cache
+/home/runner/work/agentdms/agentdms/AgentDMS.UI/obj/Debug/net8.0/staticwebassets.build.json
+/home/runner/work/agentdms/agentdms/AgentDMS.UI/obj/Debug/net8.0/staticwebassets.development.json
+/home/runner/work/agentdms/agentdms/AgentDMS.UI/obj/Debug/net8.0/staticwebassets/msbuild.AgentDMS.UI.Microsoft.AspNetCore.StaticWebAssets.props
+/home/runner/work/agentdms/agentdms/AgentDMS.UI/obj/Debug/net8.0/staticwebassets/msbuild.build.AgentDMS.UI.props
+/home/runner/work/agentdms/agentdms/AgentDMS.UI/obj/Debug/net8.0/staticwebassets/msbuild.buildMultiTargeting.AgentDMS.UI.props
+/home/runner/work/agentdms/agentdms/AgentDMS.UI/obj/Debug/net8.0/staticwebassets/msbuild.buildTransitive.AgentDMS.UI.props
+/home/runner/work/agentdms/agentdms/AgentDMS.UI/obj/Debug/net8.0/staticwebassets.pack.json
+/home/runner/work/agentdms/agentdms/AgentDMS.UI/obj/Debug/net8.0/scopedcss/bundle/AgentDMS.UI.styles.css

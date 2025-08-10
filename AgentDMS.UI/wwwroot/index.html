@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AgentDMS - PNG File Processor</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🖼️ AgentDMS PNG Processor</h1>
+            <p>Drop your PNG files here to process and generate thumbnails</p>
+        </header>
+
+        <main>
+            <div id="drop-zone" class="drop-zone">
+                <div class="drop-zone-content">
+                    <div class="drop-icon">📁</div>
+                    <h3>Drag & Drop PNG Files Here</h3>
+                    <p>or <button id="file-input-btn" class="file-input-btn">Choose Files</button></p>
+                    <small>Only PNG files are supported • Max size: 50MB</small>
+                </div>
+                <input type="file" id="file-input" accept=".png,image/png" multiple style="display: none;">
+            </div>
+
+            <div id="processing-status" class="processing-status" style="display: none;">
+                <div class="spinner"></div>
+                <span>Processing your files...</span>
+            </div>
+
+            <div id="results" class="results"></div>
+        </main>
+
+        <footer>
+            <p>Built with AgentDMS • Powered by .NET 8.0 and ImageSharp</p>
+        </footer>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>
