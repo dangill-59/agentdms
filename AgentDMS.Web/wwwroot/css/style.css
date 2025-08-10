@@ -1,0 +1,240 @@
+/* Custom styles for AgentDMS Web UI */
+
+body {
+    background-color: #f8f9fa;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+header h1 {
+    color: #2c3e50;
+    font-weight: 300;
+    margin-bottom: 10px;
+}
+
+header h1 i {
+    color: #3498db;
+    margin-right: 10px;
+}
+
+.nav-tabs .nav-link {
+    color: #6c757d;
+    border: none;
+    border-bottom: 2px solid transparent;
+    transition: all 0.3s ease;
+}
+
+.nav-tabs .nav-link:hover {
+    border-bottom-color: #3498db;
+    color: #3498db;
+}
+
+.nav-tabs .nav-link.active {
+    background-color: transparent;
+    border-bottom-color: #3498db;
+    color: #3498db;
+    font-weight: 500;
+}
+
+.nav-tabs .nav-link i {
+    margin-right: 5px;
+}
+
+.card {
+    border: none;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    transition: all 0.3s ease;
+}
+
+.card:hover {
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+.card-header {
+    background-color: #fff;
+    border-bottom: 1px solid #dee2e6;
+    font-weight: 500;
+}
+
+.card-header h5 {
+    margin: 0;
+    color: #495057;
+}
+
+.card-header i {
+    color: #3498db;
+    margin-right: 8px;
+}
+
+.btn-primary {
+    background-color: #3498db;
+    border-color: #3498db;
+    transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+    background-color: #2980b9;
+    border-color: #2980b9;
+}
+
+.progress {
+    height: 8px;
+    border-radius: 4px;
+}
+
+.progress-bar {
+    background-color: #3498db;
+}
+
+.alert {
+    border: none;
+    border-radius: 8px;
+}
+
+.alert-info {
+    background-color: #e8f4fd;
+    color: #0c5460;
+}
+
+.alert-success {
+    background-color: #d1f2eb;
+    color: #155724;
+}
+
+.alert-danger {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.result-card {
+    margin-top: 20px;
+    border-left: 4px solid #3498db;
+}
+
+.result-item {
+    padding: 15px;
+    margin-bottom: 10px;
+    background-color: #fff;
+    border-radius: 8px;
+    border-left: 4px solid transparent;
+    transition: all 0.3s ease;
+}
+
+.result-item.success {
+    border-left-color: #28a745;
+}
+
+.result-item.error {
+    border-left-color: #dc3545;
+}
+
+.result-item:hover {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+.file-info {
+    font-size: 0.9em;
+    color: #6c757d;
+}
+
+.file-name {
+    font-weight: 500;
+    color: #495057;
+}
+
+.processing-time {
+    color: #28a745;
+    font-weight: 500;
+}
+
+.thumbnail-preview {
+    max-width: 150px;
+    max-height: 150px;
+    border-radius: 8px;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+.format-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.format-item {
+    padding: 20px;
+    background-color: #fff;
+    border-radius: 8px;
+    text-align: center;
+    border: 2px solid #e9ecef;
+    transition: all 0.3s ease;
+}
+
+.format-item:hover {
+    border-color: #3498db;
+    transform: translateY(-2px);
+}
+
+.format-icon {
+    font-size: 2em;
+    color: #3498db;
+    margin-bottom: 10px;
+}
+
+.format-name {
+    font-weight: 500;
+    margin-bottom: 5px;
+}
+
+.format-description {
+    font-size: 0.85em;
+    color: #6c757d;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .format-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .nav-tabs .nav-link {
+        font-size: 0.9em;
+        padding: 0.5rem 0.75rem;
+    }
+    
+    header h1 {
+        font-size: 1.75rem;
+    }
+}
+
+/* Loading and animation styles */
+.fade-in {
+    animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.spinner-border-sm {
+    width: 1rem;
+    height: 1rem;
+}
+
+.text-success {
+    color: #28a745 !important;
+}
+
+.text-danger {
+    color: #dc3545 !important;
+}
+
+.text-warning {
+    color: #ffc107 !important;
+}
