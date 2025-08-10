@@ -15,10 +15,11 @@ A comprehensive C# utility for image file processing with support for multiple f
 
 ## Architecture
 
-The solution consists of three main projects:
+The solution consists of four main projects:
 
 - **AgentDMS.Core**: Core functionality with services and utilities
-- **AgentDMS.UI**: Command-line interface for testing and demonstration
+- **AgentDMS.UI**: Command-line interface for testing and demonstration  
+- **AgentDMS.Web**: Web-based HTML interface for browser access
 - **AgentDMS.Tests**: Unit tests for core functionality
 
 ### Core Components
@@ -29,6 +30,23 @@ The solution consists of three main projects:
 - `ImageFile` & `ProcessingResult`: Models for representing processed images and results
 
 ## Usage
+
+### Web Interface (Recommended)
+
+The easiest way to use AgentDMS is through the web interface:
+
+```bash
+# Start the web server
+dotnet run --project AgentDMS.Web
+
+# Open your browser to http://localhost:5249
+```
+
+**Web Interface Features:**
+- **Upload & Process**: Drag-and-drop file upload with real-time processing
+- **Batch Processing**: Process multiple images from file paths
+- **Gallery Generation**: Create thumbnail galleries with customizable sizes
+- **Format Support**: View all supported formats with descriptions
 
 ### Command Line Interface
 
