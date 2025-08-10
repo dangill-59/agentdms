@@ -1,6 +1,22 @@
 # AgentDMS - Image Processing Utility
 
-A comprehensive C# utility for image file processing with support for multiple formats, multipage documents, and thumbnail generation.
+A comprehensive C# utility for image file processing with support for multiple formats, multipage documents, and thumbnail generation. Now featuring a modern web interface for drag-and-drop PNG processing!
+
+## 🌟 New Web Interface
+
+AgentDMS now includes a beautiful, responsive web interface that allows users to:
+- **Drag & Drop PNG Files**: Intuitive drag-and-drop with visual feedback
+- **Instant Thumbnail Preview**: See processed thumbnails immediately
+- **Multiple File Support**: Process multiple PNG files in sequence  
+- **Real-time Processing**: Watch your files being processed with loading indicators
+- **Mobile-Friendly Design**: Works perfectly on desktop, tablet, and mobile devices
+
+### Quick Start - Web Interface
+```bash
+cd AgentDMS.UI
+dotnet run
+# Navigate to http://localhost:5000
+```
 
 ## Features
 
@@ -18,7 +34,7 @@ A comprehensive C# utility for image file processing with support for multiple f
 The solution consists of three main projects:
 
 - **AgentDMS.Core**: Core functionality with services and utilities
-- **AgentDMS.UI**: Command-line interface for testing and demonstration
+- **AgentDMS.UI**: Modern web interface with drag-and-drop functionality + legacy console interface
 - **AgentDMS.Tests**: Unit tests for core functionality
 
 ### Core Components
@@ -30,18 +46,29 @@ The solution consists of three main projects:
 
 ## Usage
 
-### Command Line Interface
+### Web Interface (Recommended)
+
+The modern web interface provides the best user experience:
 
 ```bash
-# Run in interactive mode
+# Start the web application
 dotnet run --project AgentDMS.UI
 
-# Process a single file
-dotnet run --project AgentDMS.UI --process "path/to/image.jpg"
-
-# Show help
-dotnet run --project AgentDMS.UI --help
+# Open your browser and navigate to:
+# http://localhost:5000
 ```
+
+**Web Features:**
+- 🖱️ **Drag & Drop**: Simply drag PNG files onto the drop zone
+- 📁 **File Picker**: Click "Choose Files" for traditional file selection
+- 👁️ **Instant Preview**: See thumbnails immediately after processing
+- 📱 **Responsive Design**: Works on desktop, tablet, and mobile
+- ⚡ **Real-time Feedback**: Processing indicators and error messages
+- 🎯 **PNG Focus**: Optimized specifically for PNG file processing
+
+### Command Line Interface
+
+The legacy command-line interface is available in `ConsoleProgram.cs` for advanced users and automation scenarios.
 
 ### Interactive Menu Options
 
