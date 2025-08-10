@@ -1,0 +1,34 @@
+# Build results
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+*.exe
+*.dll
+*.pdb
+
+# Visual Studio / VS Code
+.vs/
+.vscode/
+*.suo
+*.user
+*.sdf
+
+# NuGet
+packages/
+*.nupkg
+**/packages.lock.json
+
+# Other
+*.log
+*.tmp
+TestResults/
+
+# OS generated files
+Thumbs.db
+.DS_Store
+
+# IDE
+.idea/
+*.swp
+*.swo
