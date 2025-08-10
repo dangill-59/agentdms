@@ -32,3 +32,7 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+
+# Temporary output directories
+AgentDMS_Output/
+AgentDMS_Gallery/
