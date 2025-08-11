@@ -1,4 +1,5 @@
 using System;
+using System.Text.Json.Serialization;
 
 namespace AgentDMS.Core.Models;
 
@@ -14,6 +15,8 @@ public class ProcessingResult
     public TimeSpan ProcessingTime { get; set; }
     public TimeSpan? RenderingTime { get; set; }
     public ProcessingMetrics? Metrics { get; set; }
+    
+    [JsonIgnore]
     public Exception? Error { get; set; }
     
     public static ProcessingResult Successful(ImageFile image, TimeSpan processingTime, string? message = null)
