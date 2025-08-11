@@ -111,15 +111,21 @@ async function handleUpload(event) {
     const uploadBtn = document.getElementById('uploadBtn');
     const progressDiv = document.getElementById('uploadProgress');
     const resultDiv = document.getElementById('uploadResult');
+    const thumbnailViewer = document.getElementById('thumbnailViewer');
     
     if (!fileInput.files[0]) {
         showError(resultDiv, 'Please select a file to upload.');
         return;
     }
     
+    // Clear previous results and thumbnails
+    resultDiv.innerHTML = '';
+    clearThumbnailViewer(thumbnailViewer);
+    
     // Show progress
     showProgress(progressDiv, uploadBtn);
-    resultDiv.innerHTML = '';
+    
+    const renderStartTime = performance.now();
     
     try {
         const formData = new FormData();
@@ -136,7 +142,15 @@ async function handleUpload(event) {
         }
         
         const result = await response.json();
+        
+        // Calculate rendering time
+        const renderEndTime = performance.now();
+        const renderingTime = renderEndTime - renderStartTime;
+        result.renderingTime = formatDuration(renderingTime);
+        
+        // Display results and thumbnails separately
         displayProcessingResult(resultDiv, result);
+        displayThumbnailsInViewer(thumbnailViewer, [result], renderingTime);
         
     } catch (error) {
         showError(resultDiv, `Upload failed: ${error.message}`);
@@ -153,6 +167,7 @@ async function handleBatchProcess(event) {
     const batchBtn = document.getElementById('batchBtn');
     const progressDiv = document.getElementById('batchProgress');
     const resultDiv = document.getElementById('batchResult');
+    const thumbnailViewer = document.getElementById('batchThumbnailViewer');
     
     const filePaths = pathsTextarea.value
         .split('\n')
@@ -164,8 +179,13 @@ async function handleBatchProcess(event) {
         return;
     }
     
-    showProgress(progressDiv, batchBtn);
+    // Clear previous results and thumbnails
     resultDiv.innerHTML = '';
+    clearThumbnailViewer(thumbnailViewer);
+    
+    showProgress(progressDiv, batchBtn);
+    
+    const renderStartTime = performance.now();
     
     try {
         const results = await apiCall('imageprocessing/batch-process', {
@@ -173,7 +193,17 @@ async function handleBatchProcess(event) {
             body: JSON.stringify({ filePaths })
         });
         
+        // Calculate rendering time
+        const renderEndTime = performance.now();
+        const renderingTime = renderEndTime - renderStartTime;
+        
+        // Add rendering time to results
+        results.forEach(result => {
+            result.renderingTime = formatDuration(renderingTime / results.length);
+        });
+        
         displayBatchResults(resultDiv, results);
+        displayThumbnailsInViewer(thumbnailViewer, results, renderingTime);
         
     } catch (error) {
         showError(resultDiv, `Batch processing failed: ${error.message}`);
@@ -233,7 +263,7 @@ function displayProcessingResult(container, result) {
             <div class="alert alert-success fade-in">
                 <h6><i class="bi bi-check-circle"></i> Processing Successful!</h6>
                 <div class="row mt-3">
-                    <div class="col-md-6">
+                    <div class="col-12">
                         <div class="file-info">
                             <div class="file-name">${img.fileName}</div>
                             <small class="text-muted">
@@ -243,42 +273,82 @@ function displayProcessingResult(container, result) {
                             </small>
                             ${img.isMultiPage ? `<br><small class="text-info">Multi-page document (${img.pageCount} pages)</small>` : ''}
                         </div>
-                        <div class="mt-2">
-                            <small class="processing-time">
-                                <i class="bi bi-clock"></i> 
-                                Processed in ${result.processingTime ? formatDuration(result.processingTime) : 'N/A'}
-                            </small>
+                        
+                        <!-- Detailed Timing Metrics -->
+                        ${createTimingMetrics(result)}
+                        
+                        <div class="mt-3">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <small><strong>Processing Details:</strong></small>
+                                    ${img.convertedPngPath ? `<br><small>PNG Version: ${img.convertedPngPath}</small>` : ''}
+                                </div>
+                                <div class="col-md-6">
+                                    ${img.splitPagePaths && img.splitPagePaths.length > 0 ? `
+                                        <small><strong>Split Pages:</strong></small>
+                                        <ul class="list-unstyled ms-3">
+                                            ${img.splitPagePaths.slice(0, 3).map(path => `<li><small>${path}</small></li>`).join('')}
+                                            ${img.splitPagePaths.length > 3 ? `<li><small>... and ${img.splitPagePaths.length - 3} more</small></li>` : ''}
+                                        </ul>
+                                    ` : ''}
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <div class="col-md-6">
-                        ${img.thumbnailPath ? `
-                            <img src="file://${img.thumbnailPath}" class="thumbnail-preview" alt="Thumbnail" 
-                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-                            <div style="display:none;" class="text-center p-3 border rounded">
-                                <i class="bi bi-image text-muted" style="font-size: 2em;"></i>
-                                <br><small class="text-muted">Thumbnail generated</small>
-                            </div>
-                        ` : ''}
-                    </div>
                 </div>
-                ${img.convertedPngPath ? `
-                    <div class="mt-2">
-                        <small><strong>PNG Version:</strong> ${img.convertedPngPath}</small>
-                    </div>
-                ` : ''}
-                ${img.splitPagePaths && img.splitPagePaths.length > 0 ? `
-                    <div class="mt-2">
-                        <small><strong>Split Pages:</strong></small>
-                        <ul class="list-unstyled ms-3">
-                            ${img.splitPagePaths.map(path => `<li><small>${path}</small></li>`).join('')}
-                        </ul>
-                    </div>
-                ` : ''}
             </div>
         `;
     } else {
         showError(container, result.message || 'Processing failed');
     }
+}
+
+function createTimingMetrics(result) {
+    if (!result.metrics && !result.processingTime && !result.renderingTime) {
+        return '';
+    }
+    
+    const metrics = result.metrics || {};
+    const processingTime = result.processingTime || '0ms';
+    const renderingTime = result.renderingTime || '0ms';
+    
+    return `
+        <div class="timing-metrics">
+            <h6><i class="bi bi-stopwatch"></i> Performance Metrics</h6>
+            ${metrics.fileLoadTime ? `
+                <div class="timing-row">
+                    <span class="timing-label">File Load:</span>
+                    <span class="timing-value">${formatDuration(metrics.fileLoadTime)}</span>
+                </div>
+            ` : ''}
+            ${metrics.imageDecodeTime ? `
+                <div class="timing-row">
+                    <span class="timing-label">Image Decode:</span>
+                    <span class="timing-value">${formatDuration(metrics.imageDecodeTime)}</span>
+                </div>
+            ` : ''}
+            ${metrics.conversionTime ? `
+                <div class="timing-row">
+                    <span class="timing-label">Format Conversion:</span>
+                    <span class="timing-value">${formatDuration(metrics.conversionTime)}</span>
+                </div>
+            ` : ''}
+            ${metrics.thumbnailGenerationTime ? `
+                <div class="timing-row">
+                    <span class="timing-label">Thumbnail Generation:</span>
+                    <span class="timing-value">${formatDuration(metrics.thumbnailGenerationTime)}</span>
+                </div>
+            ` : ''}
+            <div class="timing-row">
+                <span class="timing-label">Total Processing:</span>
+                <span class="timing-value">${formatDuration(processingTime)}</span>
+            </div>
+            <div class="timing-row">
+                <span class="timing-label">UI Rendering:</span>
+                <span class="timing-value">${formatDuration(renderingTime)}</span>
+            </div>
+        </div>
+    `;
 }
 
 function displayBatchResults(container, results) {
@@ -294,6 +364,32 @@ function displayBatchResults(container, results) {
             </p>
         </div>
     `;
+    
+    // Show timing summary for successful results
+    if (successful > 0) {
+        const successfulResults = results.filter(r => r.success);
+        const totalProcessingTime = successfulResults.reduce((sum, r) => {
+            return sum + (r.processingTime ? parseFloat(r.processingTime) : 0);
+        }, 0);
+        
+        html += `
+            <div class="timing-metrics">
+                <h6><i class="bi bi-stopwatch"></i> Batch Performance Summary</h6>
+                <div class="timing-row">
+                    <span class="timing-label">Total Files Processed:</span>
+                    <span class="timing-value">${successful}</span>
+                </div>
+                <div class="timing-row">
+                    <span class="timing-label">Average Processing Time:</span>
+                    <span class="timing-value">${(totalProcessingTime / successful).toFixed(2)}s</span>
+                </div>
+                <div class="timing-row">
+                    <span class="timing-label">Total Processing Time:</span>
+                    <span class="timing-value total">${totalProcessingTime.toFixed(2)}s</span>
+                </div>
+            </div>
+        `;
+    }
     
     results.forEach((result, index) => {
         html += `
@@ -325,6 +421,99 @@ function displayBatchResults(container, results) {
     });
     
     container.innerHTML = html;
+}
+
+// Thumbnail viewer functions
+function clearThumbnailViewer(viewer) {
+    viewer.innerHTML = `
+        <div class="text-center text-muted">
+            <i class="bi bi-image" style="font-size: 3rem;"></i>
+            <p class="mt-2">Thumbnails will appear here</p>
+        </div>
+    `;
+    viewer.classList.remove('has-thumbnails');
+}
+
+function displayThumbnailsInViewer(viewer, results, renderingTime) {
+    const thumbnails = [];
+    
+    results.forEach((result, index) => {
+        if (result.success && result.processedImage) {
+            const img = result.processedImage;
+            
+            // Add main thumbnail
+            if (img.thumbnailPath) {
+                thumbnails.push({
+                    name: img.fileName,
+                    path: img.thumbnailPath,
+                    processingTime: result.processingTime || '0ms',
+                    renderingTime: result.renderingTime || '0ms',
+                    isMain: true
+                });
+            }
+            
+            // Add split page thumbnails for multipage documents
+            if (img.isMultiPage && result.splitPages) {
+                result.splitPages.forEach((page, pageIndex) => {
+                    if (page.thumbnailPath) {
+                        thumbnails.push({
+                            name: `${img.fileName} - Page ${pageIndex + 1}`,
+                            path: page.thumbnailPath,
+                            processingTime: result.processingTime || '0ms',
+                            renderingTime: result.renderingTime || '0ms',
+                            isPage: true
+                        });
+                    }
+                });
+            }
+        }
+    });
+    
+    if (thumbnails.length === 0) {
+        clearThumbnailViewer(viewer);
+        return;
+    }
+    
+    viewer.classList.add('has-thumbnails');
+    
+    let html = `
+        <div class="mb-2">
+            <small class="text-muted">
+                <i class="bi bi-images"></i> ${thumbnails.length} thumbnail${thumbnails.length > 1 ? 's' : ''} generated
+            </small>
+        </div>
+        <div class="thumbnail-grid">
+    `;
+    
+    thumbnails.forEach((thumb, index) => {
+        html += `
+            <div class="thumbnail-item" onclick="previewThumbnail('${thumb.path}', '${thumb.name}')">
+                ${thumb.path ? `
+                    <img src="file://${thumb.path}" alt="${thumb.name}" 
+                         onerror="this.parentElement.innerHTML='<div class=\\'thumbnail-placeholder\\'><i class=\\'bi bi-image\\'></i></div>'">
+                ` : `
+                    <div class="thumbnail-placeholder">
+                        <i class="bi bi-image"></i>
+                    </div>
+                `}
+                <div class="thumbnail-overlay">
+                    <div class="thumbnail-name">${thumb.name}</div>
+                    <div class="thumbnail-timing">
+                        P: ${formatDuration(thumb.processingTime)} | R: ${formatDuration(thumb.renderingTime)}
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    viewer.innerHTML = html;
+}
+
+function previewThumbnail(imagePath, imageName) {
+    // Create a modal or lightbox to preview the full image
+    // For now, we'll just show an alert with the image path
+    alert(`Preview: ${imageName}\\nPath: ${imagePath}`);
 }
 
 function displayGalleryResult(container, result) {
@@ -390,13 +579,34 @@ function formatFileSize(bytes) {
 }
 
 function formatDuration(duration) {
-    // Assuming duration comes as a string like "00:00:01.234567"
+    // Handle different input types
+    if (typeof duration === 'number') {
+        // Assume milliseconds if number
+        return `${(duration / 1000).toFixed(2)}s`;
+    }
+    
     if (typeof duration === 'string') {
-        const parts = duration.split(':');
-        if (parts.length === 3) {
-            const seconds = parseFloat(parts[2]);
-            return `${seconds.toFixed(2)}s`;
+        // Handle C# TimeSpan format like "00:00:01.234567"
+        if (duration.includes(':')) {
+            const parts = duration.split(':');
+            if (parts.length === 3) {
+                const seconds = parseFloat(parts[2]);
+                return `${seconds.toFixed(2)}s`;
+            }
+        }
+        
+        // Handle already formatted strings
+        if (duration.endsWith('s') || duration.endsWith('ms')) {
+            return duration;
+        }
+        
+        // Try to parse as number
+        const num = parseFloat(duration);
+        if (!isNaN(num)) {
+            return `${num.toFixed(2)}s`;
         }
     }
-    return duration;
+    
+    // Default fallback
+    return duration || '0.00s';
 }
