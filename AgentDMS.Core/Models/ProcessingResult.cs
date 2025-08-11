@@ -12,6 +12,8 @@ public class ProcessingResult
     public ImageFile? ProcessedImage { get; set; }
     public List<ImageFile>? SplitPages { get; set; }
     public TimeSpan ProcessingTime { get; set; }
+    public TimeSpan? RenderingTime { get; set; }
+    public ProcessingMetrics? Metrics { get; set; }
     public Exception? Error { get; set; }
     
     public static ProcessingResult Successful(ImageFile image, TimeSpan processingTime, string? message = null)
@@ -21,7 +23,12 @@ public class ProcessingResult
             Success = true,
             ProcessedImage = image,
             ProcessingTime = processingTime,
-            Message = message ?? "Processing completed successfully"
+            Message = message ?? "Processing completed successfully",
+            Metrics = new ProcessingMetrics 
+            { 
+                ProcessingTime = processingTime,
+                StartTime = DateTime.UtcNow - processingTime
+            }
         };
     }
     
@@ -34,4 +41,18 @@ public class ProcessingResult
             Error = error
         };
     }
+}
+
+/// <summary>
+/// Detailed metrics for processing operations
+/// </summary>
+public class ProcessingMetrics
+{
+    public DateTime StartTime { get; set; }
+    public TimeSpan ProcessingTime { get; set; }
+    public TimeSpan? FileLoadTime { get; set; }
+    public TimeSpan? ImageDecodeTime { get; set; }
+    public TimeSpan? ConversionTime { get; set; }
+    public TimeSpan? ThumbnailGenerationTime { get; set; }
+    public TimeSpan? TotalProcessingTime { get; set; }
 }

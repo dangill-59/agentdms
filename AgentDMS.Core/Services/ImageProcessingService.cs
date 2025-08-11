@@ -41,14 +41,19 @@ public class ImageProcessingService
         
         try
         {
-            var startTime = DateTime.UtcNow;
+            var overallStart = DateTime.UtcNow;
+            var metrics = new ProcessingMetrics { StartTime = overallStart };
             
             if (!File.Exists(filePath))
             {
                 return ProcessingResult.Failed($"File not found: {filePath}");
             }
 
+            // File load timing
+            var fileLoadStart = DateTime.UtcNow;
             var fileInfo = new FileInfo(filePath);
+            metrics.FileLoadTime = DateTime.UtcNow - fileLoadStart;
+
             var imageFile = new ImageFile
             {
                 OriginalFilePath = filePath,
@@ -66,11 +71,11 @@ public class ImageProcessingService
             switch (extension)
             {
                 case ".pdf":
-                    result = await ProcessPdfAsync(imageFile, cancellationToken);
+                    result = await ProcessPdfAsync(imageFile, metrics, cancellationToken);
                     break;
                 case ".tif":
                 case ".tiff":
-                    result = await ProcessMultipageTiffAsync(imageFile, cancellationToken);
+                    result = await ProcessMultipageTiffAsync(imageFile, metrics, cancellationToken);
                     break;
                 case ".jpg":
                 case ".jpeg":
@@ -78,7 +83,7 @@ public class ImageProcessingService
                 case ".bmp":
                 case ".gif":
                 case ".webp":
-                    result = await ProcessSingleImageAsync(imageFile, cancellationToken);
+                    result = await ProcessSingleImageAsync(imageFile, metrics, cancellationToken);
                     break;
                 default:
                     result = ProcessingResult.Failed($"Unsupported file format: {extension}");
@@ -87,7 +92,10 @@ public class ImageProcessingService
 
             if (result.Success && result.ProcessedImage != null)
             {
-                result.ProcessingTime = DateTime.UtcNow - startTime;
+                var totalTime = DateTime.UtcNow - overallStart;
+                result.ProcessingTime = totalTime;
+                metrics.TotalProcessingTime = totalTime;
+                result.Metrics = metrics;
             }
 
             return result;
@@ -120,25 +128,32 @@ public class ImageProcessingService
         return (await Task.WhenAll(tasks)).ToList();
     }
 
-    private async Task<ProcessingResult> ProcessSingleImageAsync(ImageFile imageFile, CancellationToken cancellationToken)
+    private async Task<ProcessingResult> ProcessSingleImageAsync(ImageFile imageFile, ProcessingMetrics metrics, CancellationToken cancellationToken)
     {
         try
         {
+            // Image decode timing
+            var decodeStart = DateTime.UtcNow;
             using var image = await SixLabors.ImageSharp.Image.LoadAsync(imageFile.OriginalFilePath, cancellationToken);
+            metrics.ImageDecodeTime = DateTime.UtcNow - decodeStart;
             
             imageFile.Width = image.Width;
             imageFile.Height = image.Height;
             imageFile.IsMultiPage = false;
             imageFile.PageCount = 1;
 
-            // Convert to PNG
+            // Conversion timing
+            var conversionStart = DateTime.UtcNow;
             var pngPath = Path.Combine(_outputDirectory, $"{Path.GetFileNameWithoutExtension(imageFile.FileName)}.png");
             await image.SaveAsPngAsync(pngPath, cancellationToken);
             imageFile.ConvertedPngPath = pngPath;
+            metrics.ConversionTime = DateTime.UtcNow - conversionStart;
 
-            // Generate thumbnail
+            // Thumbnail generation timing
+            var thumbnailStart = DateTime.UtcNow;
             var thumbnailPath = await GenerateThumbnailAsync(image, imageFile.FileName, cancellationToken);
             imageFile.ThumbnailPath = thumbnailPath;
+            metrics.ThumbnailGenerationTime = DateTime.UtcNow - thumbnailStart;
 
             return ProcessingResult.Successful(imageFile, TimeSpan.Zero);
         }
@@ -148,12 +163,15 @@ public class ImageProcessingService
         }
     }
 
-    private async Task<ProcessingResult> ProcessMultipageTiffAsync(ImageFile imageFile, CancellationToken cancellationToken)
+    private async Task<ProcessingResult> ProcessMultipageTiffAsync(ImageFile imageFile, ProcessingMetrics metrics, CancellationToken cancellationToken)
     {
         try
         {
+            // Image decode timing
+            var decodeStart = DateTime.UtcNow;
             using var bitmap = new Bitmap(imageFile.OriginalFilePath);
             var frameCount = bitmap.GetFrameCount(FrameDimension.Page);
+            metrics.ImageDecodeTime = DateTime.UtcNow - decodeStart;
             
             imageFile.IsMultiPage = frameCount > 1;
             imageFile.PageCount = frameCount;
@@ -162,6 +180,9 @@ public class ImageProcessingService
 
             var splitPages = new List<ImageFile>();
 
+            // Conversion timing starts here
+            var conversionStart = DateTime.UtcNow;
+            
             for (int frame = 0; frame < frameCount; frame++)
             {
                 bitmap.SelectActiveFrame(FrameDimension.Page, frame);
@@ -191,12 +212,16 @@ public class ImageProcessingService
                 
                 splitPages.Add(pageImage);
             }
+            
+            metrics.ConversionTime = DateTime.UtcNow - conversionStart;
 
             // Generate thumbnail for the first page as main thumbnail
+            var thumbnailStart = DateTime.UtcNow;
             if (splitPages.Any())
             {
                 imageFile.ThumbnailPath = splitPages[0].ThumbnailPath;
             }
+            metrics.ThumbnailGenerationTime = DateTime.UtcNow - thumbnailStart;
 
             var result = ProcessingResult.Successful(imageFile, TimeSpan.Zero);
             result.SplitPages = splitPages;
@@ -208,24 +233,27 @@ public class ImageProcessingService
         }
     }
 
-    private async Task<ProcessingResult> ProcessPdfAsync(ImageFile imageFile, CancellationToken cancellationToken)
+    private async Task<ProcessingResult> ProcessPdfAsync(ImageFile imageFile, ProcessingMetrics metrics, CancellationToken cancellationToken)
     {
         try
         {
             // Note: For a complete PDF processing solution, you would need additional libraries
             // like PDFiumSharp or ImageMagick.NET. For now, we'll create a placeholder implementation.
             
+            var decodeStart = DateTime.UtcNow;
             using var pdfReader = new PdfReader(imageFile.OriginalFilePath);
             using var pdfDocument = new PdfDocument(pdfReader);
             
             var pageCount = pdfDocument.GetNumberOfPages();
             imageFile.IsMultiPage = pageCount > 1;
             imageFile.PageCount = pageCount;
+            metrics.ImageDecodeTime = DateTime.UtcNow - decodeStart;
 
             // This is a simplified implementation - in a real scenario you'd convert each PDF page to an image
             // For now, we'll just extract text and create a placeholder
             var splitPages = new List<ImageFile>();
             
+            var conversionStart = DateTime.UtcNow;
             for (int pageNum = 1; pageNum <= pageCount; pageNum++)
             {
                 var page = pdfDocument.GetPage(pageNum);
@@ -245,6 +273,7 @@ public class ImageProcessingService
                 
                 splitPages.Add(pageImage);
             }
+            metrics.ConversionTime = DateTime.UtcNow - conversionStart;
 
             var result = ProcessingResult.Successful(imageFile, TimeSpan.Zero);
             result.SplitPages = splitPages;
