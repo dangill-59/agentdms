@@ -79,10 +79,37 @@ header h1 i {
 .progress {
     height: 8px;
     border-radius: 4px;
+    overflow: visible;
 }
 
 .progress-bar {
     background-color: #3498db;
+}
+
+.progress-container {
+    position: relative;
+}
+
+.progress-status {
+    text-align: center;
+    margin-top: 8px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #495057;
+    opacity: 1;
+    transition: opacity 0.3s ease;
+}
+
+.progress-status.fade-out {
+    opacity: 0;
+}
+
+.progress-status.processing {
+    color: #3498db;
+}
+
+.progress-status.complete {
+    color: #28a745;
 }
 
 .alert {
@@ -214,6 +241,7 @@ header h1 i {
     border: 2px dashed #e9ecef;
     border-radius: 8px;
     padding: 15px;
+    --thumbnail-size: 120px; /* CSS custom property for dynamic sizing */
 }
 
 .thumbnail-viewer.has-thumbnails {
@@ -221,9 +249,20 @@ header h1 i {
     background-color: #f8f9fa;
 }
 
+.thumbnail-size-control {
+    padding: 10px;
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    border: 1px solid #e9ecef;
+}
+
+.thumbnail-size-control .form-range {
+    margin-top: 5px;
+}
+
 .thumbnail-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(var(--thumbnail-size), 1fr));
     gap: 10px;
     margin-top: 10px;
 }
@@ -245,7 +284,7 @@ header h1 i {
 
 .thumbnail-item img {
     width: 100%;
-    height: 120px;
+    height: var(--thumbnail-size);
     object-fit: cover;
     display: block;
 }
@@ -277,7 +316,7 @@ header h1 i {
 
 .thumbnail-placeholder {
     width: 100%;
-    height: 120px;
+    height: var(--thumbnail-size);
     background: #f8f9fa;
     display: flex;
     align-items: center;

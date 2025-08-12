@@ -71,11 +71,13 @@
 
                                     <!-- Progress Bar -->
                                     <div id="uploadProgress" class="mt-3" style="display: none;">
-                                        <div class="progress">
-                                            <div class="progress-bar progress-bar-striped progress-bar-animated" 
-                                                 role="progressbar" style="width: 0%"></div>
+                                        <div class="progress-container">
+                                            <div class="progress">
+                                                <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                                     role="progressbar" style="width: 0%"></div>
+                                            </div>
+                                            <div id="uploadProgressStatus" class="progress-status">Processing...</div>
                                         </div>
-                                        <small class="text-muted">Processing your image...</small>
                                     </div>
 
                                     <!-- Processing Results -->
@@ -91,6 +93,14 @@
                                     <h5><i class="bi bi-images"></i> Thumbnail Viewer</h5>
                                 </div>
                                 <div class="card-body">
+                                    <!-- Thumbnail Size Slider -->
+                                    <div class="thumbnail-size-control mb-3">
+                                        <label for="thumbnailSizeSlider" class="form-label">
+                                            <small><i class="bi bi-zoom-in"></i> Thumbnail Size: <span id="thumbnailSizeDisplay">120px</span></small>
+                                        </label>
+                                        <input type="range" class="form-range" id="thumbnailSizeSlider" min="60" max="300" value="120">
+                                    </div>
+                                    
                                     <div id="thumbnailViewer" class="thumbnail-viewer">
                                         <div class="text-center text-muted">
                                             <i class="bi bi-image" style="font-size: 3rem;"></i>
@@ -131,11 +141,13 @@
 
                                     <!-- Progress -->
                                     <div id="batchProgress" class="mt-3" style="display: none;">
-                                        <div class="progress">
-                                            <div class="progress-bar progress-bar-striped progress-bar-animated" 
-                                                 role="progressbar" style="width: 0%"></div>
+                                        <div class="progress-container">
+                                            <div class="progress">
+                                                <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                                     role="progressbar" style="width: 0%"></div>
+                                            </div>
+                                            <div id="batchProgressStatus" class="progress-status">Processing...</div>
                                         </div>
-                                        <small class="text-muted">Processing files...</small>
                                     </div>
 
                                     <!-- Processing Results -->
@@ -151,6 +163,14 @@
                                     <h5><i class="bi bi-images"></i> Batch Thumbnails</h5>
                                 </div>
                                 <div class="card-body">
+                                    <!-- Batch Thumbnail Size Slider -->
+                                    <div class="thumbnail-size-control mb-3">
+                                        <label for="batchThumbnailSizeSlider" class="form-label">
+                                            <small><i class="bi bi-zoom-in"></i> Thumbnail Size: <span id="batchThumbnailSizeDisplay">120px</span></small>
+                                        </label>
+                                        <input type="range" class="form-range" id="batchThumbnailSizeSlider" min="60" max="300" value="120">
+                                    </div>
+                                    
                                     <div id="batchThumbnailViewer" class="thumbnail-viewer">
                                         <div class="text-center text-muted">
                                             <i class="bi bi-grid-3x3" style="font-size: 3rem;"></i>
@@ -203,11 +223,13 @@
 
                                     <!-- Progress -->
                                     <div id="galleryProgress" class="mt-3" style="display: none;">
-                                        <div class="progress">
-                                            <div class="progress-bar progress-bar-striped progress-bar-animated" 
-                                                 role="progressbar" style="width: 0%"></div>
+                                        <div class="progress-container">
+                                            <div class="progress">
+                                                <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                                     role="progressbar" style="width: 0%"></div>
+                                            </div>
+                                            <div id="galleryProgressStatus" class="progress-status">Generating gallery...</div>
                                         </div>
-                                        <small class="text-muted">Generating gallery...</small>
                                     </div>
 
                                     <!-- Results -->

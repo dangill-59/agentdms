@@ -10,6 +10,9 @@ function init() {
     
     // Bind event handlers
     bindEventHandlers();
+    
+    // Initialize thumbnail size controls
+    initializeThumbnailSizeControls();
 }
 
 function bindEventHandlers() {
@@ -21,6 +24,75 @@ function bindEventHandlers() {
     
     // Gallery form
     document.getElementById('galleryForm').addEventListener('submit', handleGalleryGeneration);
+}
+
+// Initialize thumbnail size controls
+function initializeThumbnailSizeControls() {
+    const savedSize = localStorage.getItem('thumbnailSize') || '120';
+    
+    // Single view slider
+    const singleSlider = document.getElementById('thumbnailSizeSlider');
+    const singleDisplay = document.getElementById('thumbnailSizeDisplay');
+    
+    if (singleSlider && singleDisplay) {
+        singleSlider.value = savedSize;
+        singleDisplay.textContent = savedSize + 'px';
+        
+        singleSlider.addEventListener('input', function() {
+            const size = this.value;
+            singleDisplay.textContent = size + 'px';
+            updateThumbnailSize('thumbnailViewer', size);
+            
+            // Also update the batch slider to keep them in sync
+            const batchSlider = document.getElementById('batchThumbnailSizeSlider');
+            const batchDisplay = document.getElementById('batchThumbnailSizeDisplay');
+            if (batchSlider && batchDisplay) {
+                batchSlider.value = size;
+                batchDisplay.textContent = size + 'px';
+                updateThumbnailSize('batchThumbnailViewer', size);
+            }
+            
+            localStorage.setItem('thumbnailSize', size);
+        });
+    }
+    
+    // Batch view slider
+    const batchSlider = document.getElementById('batchThumbnailSizeSlider');
+    const batchDisplay = document.getElementById('batchThumbnailSizeDisplay');
+    
+    if (batchSlider && batchDisplay) {
+        batchSlider.value = savedSize;
+        batchDisplay.textContent = savedSize + 'px';
+        
+        batchSlider.addEventListener('input', function() {
+            const size = this.value;
+            batchDisplay.textContent = size + 'px';
+            updateThumbnailSize('batchThumbnailViewer', size);
+            
+            // Also update the single slider to keep them in sync
+            const singleSlider = document.getElementById('thumbnailSizeSlider');
+            const singleDisplay = document.getElementById('thumbnailSizeDisplay');
+            if (singleSlider && singleDisplay) {
+                singleSlider.value = size;
+                singleDisplay.textContent = size + 'px';
+                updateThumbnailSize('thumbnailViewer', size);
+            }
+            
+            localStorage.setItem('thumbnailSize', size);
+        });
+    }
+    
+    // Apply initial size to both viewers
+    updateThumbnailSize('thumbnailViewer', savedSize);
+    updateThumbnailSize('batchThumbnailViewer', savedSize);
+}
+
+// Update thumbnail size for a specific viewer
+function updateThumbnailSize(viewerId, size) {
+    const viewer = document.getElementById(viewerId);
+    if (viewer) {
+        viewer.style.setProperty('--thumbnail-size', size + 'px');
+    }
 }
 
 // Helper function to convert absolute file paths to HTTP URLs
@@ -148,7 +220,7 @@ async function handleUpload(event) {
     clearThumbnailViewer(thumbnailViewer);
     
     // Show progress
-    showProgress(progressDiv, uploadBtn);
+    showProgress(progressDiv, uploadBtn, 'Processing image...');
     
     const renderStartTime = performance.now();
     
@@ -208,7 +280,7 @@ async function handleBatchProcess(event) {
     resultDiv.innerHTML = '';
     clearThumbnailViewer(thumbnailViewer);
     
-    showProgress(progressDiv, batchBtn);
+    showProgress(progressDiv, batchBtn, 'Processing files...');
     
     const renderStartTime = performance.now();
     
@@ -258,7 +330,7 @@ async function handleGalleryGeneration(event) {
         return;
     }
     
-    showProgress(progressDiv, galleryBtn);
+    showProgress(progressDiv, galleryBtn, 'Generating gallery...');
     resultDiv.innerHTML = '';
     
     try {
@@ -569,14 +641,54 @@ function displayGalleryResult(container, result) {
 }
 
 // Utility functions
-function showProgress(progressDiv, button) {
+function showProgress(progressDiv, button, statusText = 'Processing...') {
     progressDiv.style.display = 'block';
     button.disabled = true;
     button.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Processing...';
+    
+    // Update progress bar and status
+    const progressBar = progressDiv.querySelector('.progress-bar');
+    const statusDiv = progressDiv.querySelector('.progress-status');
+    
+    if (progressBar) {
+        progressBar.style.width = '50%';
+    }
+    
+    if (statusDiv) {
+        statusDiv.textContent = statusText;
+        statusDiv.className = 'progress-status processing';
+    }
 }
 
-function hideProgress(progressDiv, button) {
-    progressDiv.style.display = 'none';
+function hideProgress(progressDiv, button, showComplete = true) {
+    const progressBar = progressDiv.querySelector('.progress-bar');
+    const statusDiv = progressDiv.querySelector('.progress-status');
+    
+    if (showComplete && progressBar && statusDiv) {
+        // Show completion animation
+        progressBar.style.width = '100%';
+        statusDiv.textContent = 'Done!';
+        statusDiv.className = 'progress-status complete';
+        
+        // Fade out after 1.5 seconds
+        setTimeout(() => {
+            if (statusDiv) {
+                statusDiv.classList.add('fade-out');
+            }
+            setTimeout(() => {
+                progressDiv.style.display = 'none';
+                // Reset for next time
+                if (progressBar) progressBar.style.width = '0%';
+                if (statusDiv) {
+                    statusDiv.classList.remove('fade-out', 'complete', 'processing');
+                    statusDiv.textContent = 'Processing...';
+                }
+            }, 300); // Wait for fade-out animation
+        }, 1500);
+    } else {
+        progressDiv.style.display = 'none';
+    }
+    
     button.disabled = false;
     // Reset button text based on button id
     if (button.id === 'uploadBtn') {
