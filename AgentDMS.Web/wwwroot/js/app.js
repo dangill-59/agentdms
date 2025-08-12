@@ -976,4 +976,3 @@ function updateProgressBarColor(progressBar, status) {
             break;
     }
 }
-}
