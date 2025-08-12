@@ -35,6 +35,15 @@ app.UseCors();
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 
+// Configure static file serving for AgentDMS_Output directory
+var outputDirectory = Path.Combine(Path.GetTempPath(), "AgentDMS_Output");
+Directory.CreateDirectory(outputDirectory);
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(outputDirectory),
+    RequestPath = "/AgentDMS_Output"
+});
+
 app.UseRouting();
 app.MapControllers();
 

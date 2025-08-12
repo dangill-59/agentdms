@@ -23,6 +23,31 @@ function bindEventHandlers() {
     document.getElementById('galleryForm').addEventListener('submit', handleGalleryGeneration);
 }
 
+// Helper function to convert absolute file paths to HTTP URLs
+function convertToHttpUrl(filePath) {
+    if (!filePath) return '';
+    
+    // Check if it's already an HTTP URL
+    if (filePath.startsWith('http://') || filePath.startsWith('https://') || filePath.startsWith('/')) {
+        return filePath;
+    }
+    
+    // Convert absolute file path to HTTP URL
+    // Extract the AgentDMS_Output part and everything after it
+    const outputFolderName = 'AgentDMS_Output';
+    const outputIndex = filePath.indexOf(outputFolderName);
+    
+    if (outputIndex !== -1) {
+        // Extract the relative path from AgentDMS_Output onwards
+        const relativePath = filePath.substring(outputIndex);
+        return '/' + relativePath.replace(/\\/g, '/'); // Normalize path separators
+    }
+    
+    // Fallback: return empty string if we can't convert
+    console.warn('Could not convert file path to HTTP URL:', filePath);
+    return '';
+}
+
 // API Helper functions
 async function apiCall(endpoint, options = {}) {
     const baseUrl = window.location.origin;
@@ -486,10 +511,11 @@ function displayThumbnailsInViewer(viewer, results, renderingTime) {
     `;
     
     thumbnails.forEach((thumb, index) => {
+        const httpUrl = convertToHttpUrl(thumb.path);
         html += `
-            <div class="thumbnail-item" onclick="previewThumbnail('${thumb.path}', '${thumb.name}')">
-                ${thumb.path ? `
-                    <img src="file://${thumb.path}" alt="${thumb.name}" 
+            <div class="thumbnail-item" onclick="previewThumbnail('${httpUrl}', '${thumb.name}')">
+                ${httpUrl ? `
+                    <img src="${httpUrl}" alt="${thumb.name}" 
                          onerror="this.parentElement.innerHTML='<div class=\\'thumbnail-placeholder\\'><i class=\\'bi bi-image\\'></i></div>'">
                 ` : `
                     <div class="thumbnail-placeholder">
@@ -534,7 +560,7 @@ function displayGalleryResult(container, result) {
                 </div>
             </div>
             <div class="mt-3">
-                <a href="file://${result.galleryPath}" target="_blank" class="btn btn-sm btn-outline-primary">
+                <a href="${convertToHttpUrl(result.galleryPath) || result.galleryPath}" target="_blank" class="btn btn-sm btn-outline-primary">
                     <i class="bi bi-box-arrow-up-right"></i> Open Gallery
                 </a>
             </div>
