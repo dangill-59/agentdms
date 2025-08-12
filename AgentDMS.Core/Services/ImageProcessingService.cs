@@ -113,21 +113,39 @@ public class ImageProcessingService
     }
 
     /// <summary>
-    /// Process multiple files concurrently
+    /// Process multiple files concurrently with batching to prevent resource exhaustion
     /// </summary>
     public async Task<List<ProcessingResult>> ProcessMultipleImagesAsync(
         IEnumerable<string> filePaths, 
         IProgress<int>? progress = null,
         CancellationToken cancellationToken = default)
     {
-        var tasks = filePaths.Select(async filePath =>
-        {
-            var result = await ProcessImageAsync(filePath, cancellationToken);
-            progress?.Report(1);
-            return result;
-        });
+        var filePathsList = filePaths.ToList();
+        var results = new List<ProcessingResult>();
+        var processedCount = 0;
 
-        return (await Task.WhenAll(tasks)).ToList();
+        // Process files in batches to control concurrency more effectively
+        var batchSize = Math.Min(_semaphore.CurrentCount, _semaphore.CurrentCount); // Use semaphore limit as batch size
+        var actualBatchSize = Math.Max(1, batchSize);
+
+        _logger?.LogInformation("Processing {FileCount} files in batches of {BatchSize}", filePathsList.Count, actualBatchSize);
+
+        for (int i = 0; i < filePathsList.Count; i += actualBatchSize)
+        {
+            var batch = filePathsList.Skip(i).Take(actualBatchSize);
+            var batchTasks = batch.Select(async filePath =>
+            {
+                var result = await ProcessImageAsync(filePath, cancellationToken);
+                Interlocked.Increment(ref processedCount);
+                progress?.Report(processedCount);
+                return result;
+            });
+
+            var batchResults = await Task.WhenAll(batchTasks);
+            results.AddRange(batchResults);
+        }
+
+        return results;
     }
 
     private async Task<ProcessingResult> ProcessSingleImageAsync(ImageFile imageFile, ProcessingMetrics metrics, CancellationToken cancellationToken)
