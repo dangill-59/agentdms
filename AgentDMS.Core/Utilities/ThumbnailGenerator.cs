@@ -14,13 +14,21 @@ namespace AgentDMS.Core.Utilities;
 public static class ThumbnailGenerator
 {
     /// <summary>
-    /// Generate a thumbnail from an image file
+    /// Generate a high-quality thumbnail from an image file using super-sampling and advanced downscaling
     /// </summary>
-    public static async Task<string> GenerateThumbnailAsync(
+    /// <param name="inputPath">Path to the input image file</param>
+    /// <param name="outputDirectory">Output directory for the thumbnail</param>
+    /// <param name="size">Target thumbnail size (will be rendered at 3x then downscaled)</param>
+    /// <param name="customName">Custom name for the thumbnail file</param>
+    /// <param name="supersamplingMultiplier">Multiplier for super-sampling (default: 3)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Path to the generated high-quality thumbnail</returns>
+    public static async Task<string> GenerateHighQualityThumbnailAsync(
         string inputPath, 
         string outputDirectory,
         int size = 200, 
         string? customName = null,
+        int supersamplingMultiplier = 3,
         CancellationToken cancellationToken = default)
     {
         if (!File.Exists(inputPath))
@@ -35,17 +43,64 @@ public static class ThumbnailGenerator
 
         using var image = await Image.LoadAsync(inputPath, cancellationToken);
         
-        // Calculate dimensions to maintain aspect ratio
-        var (width, height) = CalculateThumbnailDimensions(image.Width, image.Height, size);
+        // Calculate super-sampling dimensions to maintain aspect ratio
+        var (superWidth, superHeight) = CalculateThumbnailDimensions(
+            image.Width, image.Height, size * supersamplingMultiplier);
         
-        using var thumbnail = image.Clone(x => x.Resize(width, height));
-        await thumbnail.SaveAsPngAsync(thumbnailPath, cancellationToken);
+        // Step 1: Render at high resolution with anti-aliasing
+        using var superSampledImage = image.Clone(x => x.Resize(new ResizeOptions
+        {
+            Size = new Size(superWidth, superHeight),
+            Mode = ResizeMode.Max,
+            Sampler = KnownResamplers.Lanczos3, // High-quality upsampling
+            Compand = true // Enable gamma correction for better quality
+        }));
+        
+        // Step 2: Calculate final thumbnail dimensions
+        var (finalWidth, finalHeight) = CalculateThumbnailDimensions(
+            superSampledImage.Width, superSampledImage.Height, size);
+        
+        // Step 3: High-quality downscaling with Lanczos3 resampler
+        using var thumbnail = superSampledImage.Clone(x => x.Resize(new ResizeOptions
+        {
+            Size = new Size(finalWidth, finalHeight),
+            Mode = ResizeMode.Max,
+            Sampler = KnownResamplers.Lanczos3, // High-quality downsampling preserves text clarity
+            Compand = true // Maintain gamma correction
+        }));
+
+        // Step 4: Save with high-quality PNG settings
+        var pngEncoder = new PngEncoder
+        {
+            CompressionLevel = PngCompressionLevel.Level1, // Minimal compression for quality
+            ColorType = PngColorType.Rgb, // Full RGB color, no palette reduction
+            BitDepth = PngBitDepth.Bit8, // 8-bit per channel for full color range
+            TransparentColorMode = PngTransparentColorMode.Preserve, // Preserve transparency if present
+            Gamma = 1.0f / 2.2f // Standard gamma for proper display
+        };
+
+        await thumbnail.SaveAsync(thumbnailPath, pngEncoder, cancellationToken);
 
         return thumbnailPath;
     }
 
     /// <summary>
-    /// Generate multiple thumbnail sizes from an image
+    /// Generate a thumbnail from an image file (updated to use high-quality method by default)
+    /// </summary>
+    public static async Task<string> GenerateThumbnailAsync(
+        string inputPath, 
+        string outputDirectory,
+        int size = 200, 
+        string? customName = null,
+        CancellationToken cancellationToken = default)
+    {
+        // Use high-quality generation by default
+        return await GenerateHighQualityThumbnailAsync(
+            inputPath, outputDirectory, size, customName, 3, cancellationToken);
+    }
+
+    /// <summary>
+    /// Generate multiple high-quality thumbnail sizes from an image
     /// </summary>
     public static async Task<Dictionary<int, string>> GenerateMultipleThumbnailsAsync(
         string inputPath,
@@ -62,17 +117,14 @@ public static class ThumbnailGenerator
 
         Directory.CreateDirectory(outputDirectory);
 
-        using var image = await Image.LoadAsync(inputPath, cancellationToken);
-        
+        // Generate each size using the high-quality method
         foreach (var size in sizes)
         {
             var fileName = Path.GetFileNameWithoutExtension(inputPath);
-            var thumbnailPath = Path.Combine(outputDirectory, $"thumb_{fileName}_{size}px.png");
+            var customName = $"{fileName}_{size}px";
             
-            var (width, height) = CalculateThumbnailDimensions(image.Width, image.Height, size);
-            
-            using var thumbnail = image.Clone(x => x.Resize(width, height));
-            await thumbnail.SaveAsPngAsync(thumbnailPath, cancellationToken);
+            var thumbnailPath = await GenerateHighQualityThumbnailAsync(
+                inputPath, outputDirectory, size, customName, 3, cancellationToken);
             
             results[size] = thumbnailPath;
         }

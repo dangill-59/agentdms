@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "LYcM/VMpcssc3whLMUogtdnrbpap4gxK0OMTu/sMiMEg5RXWktvXvS7y6ZF+l0IfwhoKZ39sOuVHDFz61KLcCw==",
+  "dgSpecHash": "ZCKsXlTphOk7vnkRiEHH5lRK9+cP5SL3Z/u6+CvEjaShSV8gu5aDNyU9IkS7HHd3OwTNMTudHcmw3kLGcLUcKg==",
   "success": true,
   "projectFilePath": "/home/runner/work/agentdms/agentdms/AgentDMS.Tests/AgentDMS.Tests.csproj",
   "expectedPackageFiles": [

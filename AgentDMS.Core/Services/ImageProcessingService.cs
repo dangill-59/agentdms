@@ -371,18 +371,71 @@ public class ImageProcessingService
     private async Task<string> GenerateThumbnailAsync(SixLabors.ImageSharp.Image image, string originalFileName, CancellationToken cancellationToken)
     {
         const int thumbnailSize = 200;
+        const int supersamplingMultiplier = 3;
         
         var thumbnailPath = Path.Combine(_outputDirectory, 
             $"thumb_{Path.GetFileNameWithoutExtension(originalFileName)}.png");
 
-        using var thumbnail = image.Clone(x => x.Resize(new ResizeOptions
+        // Calculate super-sampling dimensions to maintain aspect ratio
+        var (superWidth, superHeight) = CalculateThumbnailDimensions(
+            image.Width, image.Height, thumbnailSize * supersamplingMultiplier);
+        
+        // Step 1: Render at high resolution with anti-aliasing
+        using var superSampledImage = image.Clone(x => x.Resize(new ResizeOptions
         {
-            Size = new SixLabors.ImageSharp.Size(thumbnailSize, thumbnailSize),
-            Mode = ResizeMode.Max
+            Size = new SixLabors.ImageSharp.Size(superWidth, superHeight),
+            Mode = ResizeMode.Max,
+            Sampler = KnownResamplers.Lanczos3, // High-quality upsampling
+            Compand = true // Enable gamma correction for better quality
+        }));
+        
+        // Step 2: Calculate final thumbnail dimensions
+        var (finalWidth, finalHeight) = CalculateThumbnailDimensions(
+            superSampledImage.Width, superSampledImage.Height, thumbnailSize);
+        
+        // Step 3: High-quality downscaling with Lanczos3 resampler
+        using var thumbnail = superSampledImage.Clone(x => x.Resize(new ResizeOptions
+        {
+            Size = new SixLabors.ImageSharp.Size(finalWidth, finalHeight),
+            Mode = ResizeMode.Max,
+            Sampler = KnownResamplers.Lanczos3, // High-quality downsampling preserves text clarity
+            Compand = true // Maintain gamma correction
         }));
 
-        await thumbnail.SaveAsPngAsync(thumbnailPath, cancellationToken);
+        // Step 4: Save with high-quality PNG settings
+        var pngEncoder = new PngEncoder
+        {
+            CompressionLevel = PngCompressionLevel.Level1, // Minimal compression for quality
+            ColorType = PngColorType.Rgb, // Full RGB color, no palette reduction
+            BitDepth = PngBitDepth.Bit8, // 8-bit per channel for full color range
+            TransparentColorMode = PngTransparentColorMode.Preserve, // Preserve transparency if present
+            Gamma = 1.0f / 2.2f // Standard gamma for proper display
+        };
+
+        await thumbnail.SaveAsync(thumbnailPath, pngEncoder, cancellationToken);
         return thumbnailPath;
+    }
+
+    /// <summary>
+    /// Helper method to calculate thumbnail dimensions while maintaining aspect ratio
+    /// </summary>
+    private static (int width, int height) CalculateThumbnailDimensions(int originalWidth, int originalHeight, int maxSize)
+    {
+        if (originalWidth <= maxSize && originalHeight <= maxSize)
+        {
+            return (originalWidth, originalHeight);
+        }
+
+        double aspectRatio = (double)originalWidth / originalHeight;
+        
+        if (originalWidth > originalHeight)
+        {
+            return (maxSize, (int)(maxSize / aspectRatio));
+        }
+        else
+        {
+            return ((int)(maxSize * aspectRatio), maxSize);
+        }
     }
 
     /// <summary>

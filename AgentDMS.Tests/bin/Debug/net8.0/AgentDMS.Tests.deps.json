@@ -11,6 +11,7 @@
           "AgentDMS.Core": "1.0.0",
           "Magick.NET-Q16-AnyCPU": "14.7.0",
           "Microsoft.NET.Test.Sdk": "17.6.0",
+          "SixLabors.ImageSharp.Drawing": "2.1.7",
           "coverlet.collector": "6.0.0",
           "xunit": "2.4.2",
           "xunit.runner.visualstudio": "2.4.5"
