@@ -44,18 +44,21 @@ public class ImageProcessingService
         try
         {
             var fileName = Path.GetFileName(filePath);
-            await progressReporter?.ReportProgress(fileName, ProgressStatus.Starting, "Starting processing...");
+            if (progressReporter != null)
+                await progressReporter.ReportProgress(fileName, ProgressStatus.Starting, "Starting processing...");
             
             var overallStart = DateTime.UtcNow;
             var metrics = new ProcessingMetrics { StartTime = overallStart };
             
             if (!File.Exists(filePath))
             {
-                await progressReporter?.ReportProgress(fileName, ProgressStatus.Failed, "File not found", errorMessage: $"File not found: {filePath}");
+                if (progressReporter != null)
+                    await progressReporter.ReportProgress(fileName, ProgressStatus.Failed, "File not found", errorMessage: $"File not found: {filePath}");
                 return ProcessingResult.Failed($"File not found: {filePath}");
             }
 
-            await progressReporter?.ReportProgress(fileName, ProgressStatus.LoadingFile, "Loading file...");
+            if (progressReporter != null)
+                await progressReporter.ReportProgress(fileName, ProgressStatus.LoadingFile, "Loading file...");
             
             // File load timing
             var fileLoadStart = DateTime.UtcNow;
@@ -74,7 +77,8 @@ public class ImageProcessingService
             var extension = Path.GetExtension(filePath).ToLowerInvariant();
             imageFile.OriginalFormat = extension;
 
-            await progressReporter?.ReportProgress(fileName, ProgressStatus.ProcessingFile, $"Processing {extension.ToUpper()} file...");
+            if (progressReporter != null)
+                await progressReporter.ReportProgress(fileName, ProgressStatus.ProcessingFile, $"Processing {extension.ToUpper()} file...");
 
             ProcessingResult result;
             
@@ -96,7 +100,8 @@ public class ImageProcessingService
                     result = await ProcessSingleImageAsync(imageFile, metrics, progressReporter, cancellationToken);
                     break;
                 default:
-                    await progressReporter?.ReportProgress(fileName, ProgressStatus.Failed, "Unsupported format", errorMessage: $"Unsupported file format: {extension}");
+                    if (progressReporter != null)
+                        await progressReporter.ReportProgress(fileName, ProgressStatus.Failed, "Unsupported format", errorMessage: $"Unsupported file format: {extension}");
                     result = ProcessingResult.Failed($"Unsupported file format: {extension}");
                     break;
             }
@@ -108,7 +113,8 @@ public class ImageProcessingService
                 metrics.TotalProcessingTime = totalTime;
                 result.Metrics = metrics;
                 
-                await progressReporter?.ReportProgress(fileName, ProgressStatus.Completed, "Processing completed successfully");
+                if (progressReporter != null)
+                    await progressReporter.ReportProgress(fileName, ProgressStatus.Completed, "Processing completed successfully");
             }
 
             return result;
@@ -116,7 +122,8 @@ public class ImageProcessingService
         catch (Exception ex)
         {
             var fileName = Path.GetFileName(filePath);
-            await progressReporter?.ReportProgress(fileName, ProgressStatus.Failed, "Processing failed", errorMessage: ex.Message);
+            if (progressReporter != null)
+                await progressReporter.ReportProgress(fileName, ProgressStatus.Failed, "Processing failed", errorMessage: ex.Message);
             return ProcessingResult.Failed($"Error processing {filePath}: {ex.Message}", ex);
         }
         finally
@@ -162,7 +169,8 @@ public class ImageProcessingService
                         // Update progress with batch context
                         fileProgress.CurrentFile = fileIndex;
                         fileProgress.TotalFiles = totalFiles;
-                        await progressReporter.OnProgress(fileProgress);
+                        if (progressReporter.OnProgress != null)
+                            await progressReporter.OnProgress(fileProgress);
                     });
                 }
                 
@@ -187,7 +195,8 @@ public class ImageProcessingService
         {
             _logger?.LogInformation("Processing single image: {FilePath}", imageFile.OriginalFilePath);
             
-            await progressReporter?.ReportProgress(imageFile.FileName, ProgressStatus.LoadingFile, "Decoding image...", 1, 1, 1, 1);
+            if (progressReporter != null)
+                await progressReporter.ReportProgress(imageFile.FileName, ProgressStatus.LoadingFile, "Decoding image...", 1, 1, 1, 1);
             
             // Image decode timing
             var decodeStart = DateTime.UtcNow;
@@ -199,7 +208,8 @@ public class ImageProcessingService
             imageFile.IsMultiPage = false;
             imageFile.PageCount = 1;
 
-            await progressReporter?.ReportProgress(imageFile.FileName, ProgressStatus.ConvertingPage, "Converting to PNG...", 1, 1, 1, 1);
+            if (progressReporter != null)
+                await progressReporter.ReportProgress(imageFile.FileName, ProgressStatus.ConvertingPage, "Converting to PNG...", 1, 1, 1, 1);
 
             // Conversion timing
             var conversionStart = DateTime.UtcNow;
@@ -219,7 +229,8 @@ public class ImageProcessingService
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Error processing single image: {FilePath}", imageFile.OriginalFilePath);
-            await progressReporter?.ReportProgress(imageFile.FileName, ProgressStatus.Failed, "Failed to process image", 1, 1, 1, 1, ex.Message);
+            if (progressReporter != null)
+                await progressReporter.ReportProgress(imageFile.FileName, ProgressStatus.Failed, "Failed to process image", 1, 1, 1, 1, ex.Message);
             return ProcessingResult.Failed($"Error processing single image: {ex.Message}", ex);
         }
     }
@@ -230,7 +241,8 @@ public class ImageProcessingService
         {
             _logger?.LogInformation("Processing TIFF file: {FilePath}", imageFile.OriginalFilePath);
             
-            await progressReporter?.ReportProgress(imageFile.FileName, ProgressStatus.LoadingFile, "Reading TIFF pages...", 1, 1, 1, 1);
+            if (progressReporter != null)
+                await progressReporter.ReportProgress(imageFile.FileName, ProgressStatus.LoadingFile, "Reading TIFF pages...", 1, 1, 1, 1);
             
             // Image decode timing
             var decodeStart = DateTime.UtcNow;
@@ -258,8 +270,9 @@ public class ImageProcessingService
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 
-                await progressReporter?.ReportProgress(imageFile.FileName, ProgressStatus.ConvertingPage, 
-                    $"Converting page {frame + 1} of {frameCount}...", 1, 1, frame + 1, frameCount);
+                if (progressReporter != null)
+                    await progressReporter.ReportProgress(imageFile.FileName, ProgressStatus.ConvertingPage, 
+                        $"Converting page {frame + 1} of {frameCount}...", 1, 1, frame + 1, frameCount);
                 
                 var magickImage = magickImageCollection[frame];
                 var pagePath = Path.Combine(_outputDirectory, 
@@ -309,7 +322,8 @@ public class ImageProcessingService
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Error processing TIFF file: {FilePath}", imageFile.OriginalFilePath);
-            await progressReporter?.ReportProgress(imageFile.FileName, ProgressStatus.Failed, "Failed to process TIFF", 1, 1, 1, 1, ex.Message);
+            if (progressReporter != null)
+                await progressReporter.ReportProgress(imageFile.FileName, ProgressStatus.Failed, "Failed to process TIFF", 1, 1, 1, 1, ex.Message);
             return ProcessingResult.Failed($"Error processing TIFF: {ex.Message}", ex);
         }
     }
@@ -320,7 +334,8 @@ public class ImageProcessingService
         {
             _logger?.LogInformation("Processing PDF file: {FilePath}", imageFile.OriginalFilePath);
             
-            await progressReporter?.ReportProgress(imageFile.FileName, ProgressStatus.LoadingFile, "Reading PDF pages...", 1, 1, 1, 1);
+            if (progressReporter != null)
+                await progressReporter.ReportProgress(imageFile.FileName, ProgressStatus.LoadingFile, "Reading PDF pages...", 1, 1, 1, 1);
             
             var decodeStart = DateTime.UtcNow;
             
@@ -355,8 +370,9 @@ public class ImageProcessingService
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 
-                await progressReporter?.ReportProgress(imageFile.FileName, ProgressStatus.ConvertingPage,
-                    $"Converting page {pageNum + 1} of {pageCount}...", 1, 1, pageNum + 1, pageCount);
+                if (progressReporter != null)
+                    await progressReporter.ReportProgress(imageFile.FileName, ProgressStatus.ConvertingPage,
+                        $"Converting page {pageNum + 1} of {pageCount}...", 1, 1, pageNum + 1, pageCount);
                 
                 var magickImage = magickImageCollection[pageNum];
                 var pagePath = Path.Combine(_outputDirectory,
@@ -410,7 +426,8 @@ public class ImageProcessingService
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Error processing PDF file: {FilePath}", imageFile.OriginalFilePath);
-            await progressReporter?.ReportProgress(imageFile.FileName, ProgressStatus.Failed, "Failed to process PDF", 1, 1, 1, 1, ex.Message);
+            if (progressReporter != null)
+                await progressReporter.ReportProgress(imageFile.FileName, ProgressStatus.Failed, "Failed to process PDF", 1, 1, 1, 1, ex.Message);
             return ProcessingResult.Failed($"Error processing PDF: {ex.Message}", ex);
         }
     }
