@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("AgentDMS.Tests")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+2f1822b997bf733ed649a9a22a02a13267183ee2")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+f9e6fb3010f84cdc275d98e051f1a59178fd5632")]
 [assembly: System.Reflection.AssemblyProductAttribute("AgentDMS.Tests")]
 [assembly: System.Reflection.AssemblyTitleAttribute("AgentDMS.Tests")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
