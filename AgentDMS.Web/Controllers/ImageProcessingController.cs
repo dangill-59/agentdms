@@ -14,17 +14,20 @@ public class ImageProcessingController : ControllerBase
     private readonly ImageProcessingService _imageProcessor;
     private readonly FileUploadService _fileUploadService;
     private readonly IProgressBroadcaster _progressBroadcaster;
+    private readonly IBackgroundJobService _backgroundJobService;
     private readonly ILogger<ImageProcessingController> _logger;
 
     public ImageProcessingController(
         ImageProcessingService imageProcessor, 
         FileUploadService fileUploadService,
         IProgressBroadcaster progressBroadcaster,
+        IBackgroundJobService backgroundJobService,
         ILogger<ImageProcessingController> logger)
     {
         _imageProcessor = imageProcessor;
         _fileUploadService = fileUploadService;
         _progressBroadcaster = progressBroadcaster;
+        _backgroundJobService = backgroundJobService;
         _logger = logger;
     }
 
@@ -35,14 +38,12 @@ public class ImageProcessingController : ControllerBase
     }
 
     [HttpPost("upload")]
-    public async Task<ActionResult<ProcessingResult>> UploadAndProcessImage(IFormFile file)
+    public async Task<ActionResult<UploadResponse>> UploadAndProcessImage(IFormFile file)
     {
         if (file == null || file.Length == 0)
         {
             return BadRequest(new { error = "No file uploaded" });
         }
-
-        var jobId = Guid.NewGuid().ToString();
 
         try
         {
@@ -57,39 +58,99 @@ public class ImageProcessingController : ControllerBase
                 await file.CopyToAsync(stream);
             }
 
-            // Create progress reporter for real-time updates
-            var progressReporter = new DetailedProgressReporter(jobId, async (progress) =>
+            // Enqueue job for background processing
+            var jobId = await _backgroundJobService.EnqueueJobAsync(tempFilePath);
+
+            _logger.LogInformation("File uploaded successfully. Job ID: {JobId}, File: {FileName}", jobId, file.FileName);
+
+            // Return immediately with job ID
+            return Ok(new UploadResponse
             {
-                await _progressBroadcaster.BroadcastProgress(jobId, progress);
+                JobId = jobId,
+                FileName = file.FileName,
+                FileSize = file.Length,
+                Message = "File uploaded successfully. Processing started.",
+                Status = "processing"
             });
-
-            // Process the image with progress updates
-            var result = await _imageProcessor.ProcessImageAsync(tempFilePath, progressReporter);
-            
-            // Clean up temp file
-            System.IO.File.Delete(tempFilePath);
-
-            // Add job ID to response
-            return Ok(new { jobId, result });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error processing uploaded file");
-            
-            // Report failure via SignalR
-            await _progressBroadcaster.BroadcastProgress(jobId, new ProgressReport
+            _logger.LogError(ex, "Error uploading file: {FileName}", file.FileName);
+            return StatusCode(500, new { error = "Upload failed", message = ex.Message });
+        }
+    }
+
+    [HttpGet("job/{jobId}/status")]
+    public async Task<ActionResult<JobStatusResponse>> GetJobStatus(string jobId)
+    {
+        if (string.IsNullOrWhiteSpace(jobId))
+        {
+            return BadRequest(new { error = "Job ID is required" });
+        }
+
+        try
+        {
+            var job = await _backgroundJobService.GetJobStatusAsync(jobId);
+            if (job == null)
             {
-                JobId = jobId,
-                Status = ProgressStatus.Failed,
-                StatusMessage = "Processing failed",
-                ErrorMessage = ex.Message
+                return NotFound(new { error = "Job not found" });
+            }
+
+            return Ok(new JobStatusResponse
+            {
+                JobId = job.JobId,
+                Status = job.Status.ToString(),
+                CreatedAt = job.CreatedAt,
+                ErrorMessage = job.ErrorMessage
             });
-            
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting job status for job ID: {JobId}", jobId);
             return StatusCode(500, new { error = "Internal server error", message = ex.Message });
         }
     }
 
-    [HttpPost("process")]
+    [HttpGet("job/{jobId}/result")]
+    public async Task<ActionResult<ProcessingResult>> GetJobResult(string jobId)
+    {
+        if (string.IsNullOrWhiteSpace(jobId))
+        {
+            return BadRequest(new { error = "Job ID is required" });
+        }
+
+        try
+        {
+            var job = await _backgroundJobService.GetJobStatusAsync(jobId);
+            if (job == null)
+            {
+                return NotFound(new { error = "Job not found" });
+            }
+
+            if (job.Status == JobStatus.Queued || job.Status == JobStatus.Processing)
+            {
+                return Accepted(new { message = "Job is still processing", status = job.Status.ToString() });
+            }
+
+            if (job.Status == JobStatus.Failed)
+            {
+                return StatusCode(500, new { error = "Job failed", message = job.ErrorMessage });
+            }
+
+            var result = await _backgroundJobService.GetJobResultAsync(jobId);
+            if (result == null)
+            {
+                return NotFound(new { error = "Job result not found" });
+            }
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting job result for job ID: {JobId}", jobId);
+            return StatusCode(500, new { error = "Internal server error", message = ex.Message });
+        }
+    }
     public async Task<ActionResult<ProcessingResult>> ProcessImageByPath([FromBody] ProcessImageRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.FilePath))
@@ -250,4 +311,21 @@ public class GalleryResult
     public string GalleryPath { get; set; } = string.Empty;
     public string OutputDirectory { get; set; } = string.Empty;
     public int TotalImages { get; set; }
+}
+
+public class UploadResponse
+{
+    public string JobId { get; set; } = string.Empty;
+    public string FileName { get; set; } = string.Empty;
+    public long FileSize { get; set; }
+    public string Message { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+}
+
+public class JobStatusResponse
+{
+    public string JobId { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; }
+    public string? ErrorMessage { get; set; }
 }

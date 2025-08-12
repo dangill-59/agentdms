@@ -14,7 +14,10 @@ builder.Services.AddSignalR();
 // Add AgentDMS Core services
 builder.Services.AddSingleton<ImageProcessingService>();
 builder.Services.AddSingleton<FileUploadService>();
-builder.Services.AddScoped<IProgressBroadcaster, SignalRProgressBroadcaster>();
+builder.Services.AddSingleton<IProgressBroadcaster, SignalRProgressBroadcaster>();
+builder.Services.AddSingleton<IBackgroundJobService, BackgroundJobService>();
+builder.Services.AddHostedService<BackgroundJobService>(provider => 
+    (BackgroundJobService)provider.GetRequiredService<IBackgroundJobService>());
 
 // Configure CORS to allow all origins for development (updated for SignalR)
 builder.Services.AddCors(options =>

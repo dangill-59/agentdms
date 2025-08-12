@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.SignalR;
 using AgentDMS.Core.Models;
+using AgentDMS.Core.Services;
 
 namespace AgentDMS.Web.Hubs;
 
@@ -23,14 +24,6 @@ public class ProgressHub : Hub
     {
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"job_{jobId}");
     }
-}
-
-/// <summary>
-/// Service for broadcasting progress updates via SignalR
-/// </summary>
-public interface IProgressBroadcaster
-{
-    Task BroadcastProgress(string jobId, ProgressReport progress);
 }
 
 /// <summary>
