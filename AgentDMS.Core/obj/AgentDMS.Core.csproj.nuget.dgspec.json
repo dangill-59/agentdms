@@ -38,6 +38,14 @@
         "net8.0": {
           "targetAlias": "net8.0",
           "dependencies": {
+            "Magick.NET-Q16-AnyCPU": {
+              "target": "Package",
+              "version": "[14.7.0, )"
+            },
+            "Microsoft.Extensions.Logging.Abstractions": {
+              "target": "Package",
+              "version": "[8.0.2, )"
+            },
             "SixLabors.ImageSharp": {
               "target": "Package",
               "version": "[3.1.11, )"
@@ -45,10 +53,6 @@
             "SixLabors.ImageSharp.Drawing": {
               "target": "Package",
               "version": "[2.1.7, )"
-            },
-            "System.Drawing.Common": {
-              "target": "Package",
-              "version": "[9.0.8, )"
             },
             "itext7": {
               "target": "Package",

@@ -6,11 +6,8 @@ using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats;
 using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.Processing;
-using System.Drawing;
-using System.Drawing.Imaging;
-using iText.Kernel.Pdf;
-using iText.Kernel.Pdf.Canvas.Parser;
-using iText.Kernel.Pdf.Canvas.Parser.Listener;
+using ImageMagick;
+using Microsoft.Extensions.Logging;
 using AgentDMS.Core.Models;
 
 namespace AgentDMS.Core.Services;
@@ -22,14 +19,19 @@ public class ImageProcessingService
 {
     private readonly SemaphoreSlim _semaphore;
     private readonly string _outputDirectory;
+    private readonly ILogger<ImageProcessingService>? _logger;
 
-    public ImageProcessingService(int maxConcurrency = 4, string? outputDirectory = null)
+    public ImageProcessingService(int maxConcurrency = 4, string? outputDirectory = null, ILogger<ImageProcessingService>? logger = null)
     {
         _semaphore = new SemaphoreSlim(maxConcurrency);
         _outputDirectory = outputDirectory ?? Path.Combine(Path.GetTempPath(), "AgentDMS_Output");
+        _logger = logger;
         
         // Ensure output directory exists
         Directory.CreateDirectory(_outputDirectory);
+        
+        // Initialize Magick.NET
+        MagickNET.Initialize();
     }
 
     /// <summary>
@@ -132,6 +134,8 @@ public class ImageProcessingService
     {
         try
         {
+            _logger?.LogInformation("Processing single image: {FilePath}", imageFile.OriginalFilePath);
+            
             // Image decode timing
             var decodeStart = DateTime.UtcNow;
             using var image = await SixLabors.ImageSharp.Image.LoadAsync(imageFile.OriginalFilePath, cancellationToken);
@@ -155,10 +159,12 @@ public class ImageProcessingService
             imageFile.ThumbnailPath = thumbnailPath;
             metrics.ThumbnailGenerationTime = DateTime.UtcNow - thumbnailStart;
 
+            _logger?.LogDebug("Successfully processed single image: {FilePath}", imageFile.OriginalFilePath);
             return ProcessingResult.Successful(imageFile, TimeSpan.Zero);
         }
         catch (Exception ex)
         {
+            _logger?.LogError(ex, "Error processing single image: {FilePath}", imageFile.OriginalFilePath);
             return ProcessingResult.Failed($"Error processing single image: {ex.Message}", ex);
         }
     }
@@ -167,16 +173,24 @@ public class ImageProcessingService
     {
         try
         {
+            _logger?.LogInformation("Processing TIFF file: {FilePath}", imageFile.OriginalFilePath);
+            
             // Image decode timing
             var decodeStart = DateTime.UtcNow;
-            using var bitmap = new Bitmap(imageFile.OriginalFilePath);
-            var frameCount = bitmap.GetFrameCount(FrameDimension.Page);
+            
+            using var magickImageCollection = new MagickImageCollection();
+            magickImageCollection.Read(imageFile.OriginalFilePath);
+            
+            var frameCount = magickImageCollection.Count;
             metrics.ImageDecodeTime = DateTime.UtcNow - decodeStart;
             
             imageFile.IsMultiPage = frameCount > 1;
             imageFile.PageCount = frameCount;
-            imageFile.Width = bitmap.Width;
-            imageFile.Height = bitmap.Height;
+            
+            // Get dimensions from the first frame
+            var firstImage = magickImageCollection[0];
+            imageFile.Width = (int)firstImage.Width;
+            imageFile.Height = (int)firstImage.Height;
 
             var splitPages = new List<ImageFile>();
 
@@ -185,12 +199,15 @@ public class ImageProcessingService
             
             for (int frame = 0; frame < frameCount; frame++)
             {
-                bitmap.SelectActiveFrame(FrameDimension.Page, frame);
+                cancellationToken.ThrowIfCancellationRequested();
                 
+                var magickImage = magickImageCollection[frame];
                 var pagePath = Path.Combine(_outputDirectory, 
                     $"{Path.GetFileNameWithoutExtension(imageFile.FileName)}_page_{frame + 1}.png");
                 
-                bitmap.Save(pagePath, System.Drawing.Imaging.ImageFormat.Png);
+                // Convert to PNG using ImageMagick
+                magickImage.Format = MagickFormat.Png;
+                await magickImage.WriteAsync(pagePath, cancellationToken);
                 imageFile.SplitPagePaths.Add(pagePath);
 
                 // Create ImageFile for each page
@@ -199,18 +216,19 @@ public class ImageProcessingService
                     OriginalFilePath = pagePath,
                     FileName = Path.GetFileName(pagePath),
                     OriginalFormat = ".tiff",
-                    Width = bitmap.Width,
-                    Height = bitmap.Height,
+                    Width = (int)magickImage.Width,
+                    Height = (int)magickImage.Height,
                     ConvertedPngPath = pagePath,
                     IsMultiPage = false,
                     PageCount = 1
                 };
 
-                // Generate thumbnail for each page
-                using var pageImg = await SixLabors.ImageSharp.Image.LoadAsync(pagePath, cancellationToken);
-                pageImage.ThumbnailPath = await GenerateThumbnailAsync(pageImg, $"page_{frame + 1}_{imageFile.FileName}", cancellationToken);
+                // Generate thumbnail for each page using ImageSharp
+                using var imageSharpImage = await SixLabors.ImageSharp.Image.LoadAsync(pagePath, cancellationToken);
+                pageImage.ThumbnailPath = await GenerateThumbnailAsync(imageSharpImage, $"page_{frame + 1}_{imageFile.FileName}", cancellationToken);
                 
                 splitPages.Add(pageImage);
+                _logger?.LogDebug("Generated page {PageNumber} for TIFF: {PagePath}", frame + 1, pagePath);
             }
             
             metrics.ConversionTime = DateTime.UtcNow - conversionStart;
@@ -225,10 +243,13 @@ public class ImageProcessingService
 
             var result = ProcessingResult.Successful(imageFile, TimeSpan.Zero);
             result.SplitPages = splitPages;
+            
+            _logger?.LogInformation("Successfully processed TIFF with {PageCount} pages", frameCount);
             return result;
         }
         catch (Exception ex)
         {
+            _logger?.LogError(ex, "Error processing TIFF file: {FilePath}", imageFile.OriginalFilePath);
             return ProcessingResult.Failed($"Error processing TIFF: {ex.Message}", ex);
         }
     }
@@ -237,50 +258,94 @@ public class ImageProcessingService
     {
         try
         {
-            // Note: For a complete PDF processing solution, you would need additional libraries
-            // like PDFiumSharp or ImageMagick.NET. For now, we'll create a placeholder implementation.
+            _logger?.LogInformation("Processing PDF file: {FilePath}", imageFile.OriginalFilePath);
             
             var decodeStart = DateTime.UtcNow;
-            using var pdfReader = new PdfReader(imageFile.OriginalFilePath);
-            using var pdfDocument = new PdfDocument(pdfReader);
             
-            var pageCount = pdfDocument.GetNumberOfPages();
+            using var magickImageCollection = new MagickImageCollection();
+            
+            // Set PDF read settings for better quality
+            var readSettings = new MagickReadSettings()
+            {
+                Density = new Density(150), // 150 DPI for good quality
+                Format = MagickFormat.Pdf
+            };
+            
+            magickImageCollection.Read(imageFile.OriginalFilePath, readSettings);
+            
+            var pageCount = magickImageCollection.Count;
             imageFile.IsMultiPage = pageCount > 1;
             imageFile.PageCount = pageCount;
             metrics.ImageDecodeTime = DateTime.UtcNow - decodeStart;
 
-            // This is a simplified implementation - in a real scenario you'd convert each PDF page to an image
-            // For now, we'll just extract text and create a placeholder
+            // Get dimensions from the first page
+            if (magickImageCollection.Count > 0)
+            {
+                var firstPage = magickImageCollection[0];
+                imageFile.Width = (int)firstPage.Width;
+                imageFile.Height = (int)firstPage.Height;
+            }
+
             var splitPages = new List<ImageFile>();
             
             var conversionStart = DateTime.UtcNow;
-            for (int pageNum = 1; pageNum <= pageCount; pageNum++)
+            for (int pageNum = 0; pageNum < pageCount; pageNum++)
             {
-                var page = pdfDocument.GetPage(pageNum);
-                var strategy = new SimpleTextExtractionStrategy();
-                var text = PdfTextExtractor.GetTextFromPage(page, strategy);
+                cancellationToken.ThrowIfCancellationRequested();
                 
-                // Create a placeholder image file entry for each page
+                var magickImage = magickImageCollection[pageNum];
+                var pagePath = Path.Combine(_outputDirectory,
+                    $"{Path.GetFileNameWithoutExtension(imageFile.FileName)}_page_{pageNum + 1}.png");
+
+                // Convert PDF page to PNG with high quality
+                magickImage.Format = MagickFormat.Png;
+                magickImage.ColorType = ColorType.TrueColor;
+                magickImage.BackgroundColor = MagickColors.White;
+                
+                await magickImage.WriteAsync(pagePath, cancellationToken);
+                imageFile.SplitPagePaths.Add(pagePath);
+
+                // Create a proper ImageFile entry for each page
                 var pageImage = new ImageFile
                 {
-                    OriginalFilePath = imageFile.OriginalFilePath,
-                    FileName = $"{Path.GetFileNameWithoutExtension(imageFile.FileName)}_page_{pageNum}.pdf",
+                    OriginalFilePath = pagePath,
+                    FileName = Path.GetFileName(pagePath),
                     OriginalFormat = ".pdf",
+                    Width = (int)magickImage.Width,
+                    Height = (int)magickImage.Height,
+                    ConvertedPngPath = pagePath,
                     IsMultiPage = false,
                     PageCount = 1,
-                    Metadata = new Dictionary<string, object> { { "ExtractedText", text } }
+                    FileSize = new FileInfo(pagePath).Length,
+                    CreatedDate = DateTime.UtcNow
                 };
+
+                // Generate thumbnail for each page using ImageSharp
+                using var imageSharpImage = await SixLabors.ImageSharp.Image.LoadAsync(pagePath, cancellationToken);
+                pageImage.ThumbnailPath = await GenerateThumbnailAsync(imageSharpImage, $"page_{pageNum + 1}_{imageFile.FileName}", cancellationToken);
                 
                 splitPages.Add(pageImage);
+                _logger?.LogDebug("Generated page {PageNumber} for PDF: {PagePath}", pageNum + 1, pagePath);
             }
             metrics.ConversionTime = DateTime.UtcNow - conversionStart;
 
+            // Generate main thumbnail from the first page
+            var thumbnailStart = DateTime.UtcNow;
+            if (splitPages.Any())
+            {
+                imageFile.ThumbnailPath = splitPages[0].ThumbnailPath;
+            }
+            metrics.ThumbnailGenerationTime = DateTime.UtcNow - thumbnailStart;
+
             var result = ProcessingResult.Successful(imageFile, TimeSpan.Zero);
             result.SplitPages = splitPages;
+            
+            _logger?.LogInformation("Successfully processed PDF with {PageCount} pages", pageCount);
             return result;
         }
         catch (Exception ex)
         {
+            _logger?.LogError(ex, "Error processing PDF file: {FilePath}", imageFile.OriginalFilePath);
             return ProcessingResult.Failed($"Error processing PDF: {ex.Message}", ex);
         }
     }

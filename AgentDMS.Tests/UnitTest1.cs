@@ -6,6 +6,7 @@ using AgentDMS.Core.Models;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.Processing;
+using ImageMagick;
 
 namespace AgentDMS.Tests;
 
@@ -124,6 +125,44 @@ public class ImageProcessingServiceTests
         Assert.Contains(".tiff", extensions);
     }
 
+    [Fact]
+    public async Task ProcessImageAsync_WithPdfFile_ShouldGenerateImages()
+    {
+        // Arrange - Create a simple PDF with text
+        var testPdfPath = CreateTestPdf("test.pdf");
+        
+        try
+        {
+            // Act
+            var result = await _imageProcessor.ProcessImageAsync(testPdfPath);
+
+            // Assert
+            Assert.True(result.Success, $"Processing failed: {result.Message}");
+            Assert.NotNull(result.ProcessedImage);
+            Assert.Equal(".pdf", result.ProcessedImage.OriginalFormat);
+            Assert.True(result.ProcessedImage.PageCount >= 1);
+            Assert.NotNull(result.SplitPages);
+            Assert.True(result.SplitPages.Count >= 1);
+            
+            // Verify each page has actual image files and thumbnails
+            foreach (var page in result.SplitPages)
+            {
+                Assert.True(File.Exists(page.ConvertedPngPath), $"PNG file should exist: {page.ConvertedPngPath}");
+                Assert.True(File.Exists(page.ThumbnailPath), $"Thumbnail should exist: {page.ThumbnailPath}");
+                Assert.True(page.Width > 0 && page.Height > 0);
+            }
+            
+            // Verify main image has a thumbnail
+            Assert.True(File.Exists(result.ProcessedImage.ThumbnailPath), "Main image should have thumbnail");
+        }
+        finally
+        {
+            // Cleanup
+            if (File.Exists(testPdfPath))
+                File.Delete(testPdfPath);
+        }
+    }
+
     private string CreateTestImage(string fileName)
     {
         var path = Path.Combine(_testOutputDir, fileName);
@@ -132,6 +171,23 @@ public class ImageProcessingServiceTests
         using var image = new Image<SixLabors.ImageSharp.PixelFormats.Rgba32>(100, 100);
         image.Mutate(x => x.BackgroundColor(SixLabors.ImageSharp.Color.Red));
         image.SaveAsPng(path);
+        
+        return path;
+    }
+
+    private string CreateTestPdf(string fileName)
+    {
+        var path = Path.Combine(_testOutputDir, fileName);
+        
+        // Create a simple PDF using ImageMagick for testing
+        using var image = new ImageMagick.MagickImage(ImageMagick.MagickColors.White, 200, 150);
+        
+        // Add some visual content - just a colored rectangle
+        using var drawableImage = new ImageMagick.MagickImage(ImageMagick.MagickColors.LightBlue, 150, 100);
+        image.Composite(drawableImage, 25, 25, ImageMagick.CompositeOperator.Over);
+        
+        image.Format = ImageMagick.MagickFormat.Pdf;
+        image.Write(path);
         
         return path;
     }
