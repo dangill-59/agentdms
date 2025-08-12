@@ -191,4 +191,64 @@ public class ImageProcessingServiceTests
         
         return path;
     }
+
+    [Fact]
+    public async Task ProcessImageAsync_WithTiffFile_ShouldGenerateImages()
+    {
+        // Arrange - Create a simple multi-page TIFF
+        var testTiffPath = CreateTestTiff("test_multipage.tiff");
+        
+        try
+        {
+            // Act
+            var result = await _imageProcessor.ProcessImageAsync(testTiffPath);
+
+            // Assert
+            Assert.True(result.Success, $"Processing failed: {result.Message}");
+            Assert.NotNull(result.ProcessedImage);
+            Assert.Equal(".tiff", result.ProcessedImage.OriginalFormat);
+            Assert.True(result.ProcessedImage.PageCount >= 1);
+            Assert.NotNull(result.SplitPages);
+            
+            // Verify each page has actual image files and thumbnails
+            foreach (var page in result.SplitPages)
+            {
+                Assert.True(File.Exists(page.ConvertedPngPath), $"PNG file should exist: {page.ConvertedPngPath}");
+                Assert.True(File.Exists(page.ThumbnailPath), $"Thumbnail should exist: {page.ThumbnailPath}");
+                Assert.True(page.Width > 0 && page.Height > 0);
+            }
+            
+            // Verify main image has a thumbnail
+            Assert.True(File.Exists(result.ProcessedImage.ThumbnailPath), "Main image should have thumbnail");
+        }
+        finally
+        {
+            // Cleanup
+            if (File.Exists(testTiffPath))
+                File.Delete(testTiffPath);
+        }
+    }
+
+    private string CreateTestTiff(string fileName)
+    {
+        var path = Path.Combine(_testOutputDir, fileName);
+        
+        // Create a simple multi-page TIFF using ImageMagick
+        using var collection = new ImageMagick.MagickImageCollection();
+        
+        // Create page 1
+        using var page1 = new ImageMagick.MagickImage(ImageMagick.MagickColors.Yellow, 150, 100);
+        using var overlay1 = new ImageMagick.MagickImage(ImageMagick.MagickColors.Purple, 50, 30);
+        page1.Composite(overlay1, 50, 35, ImageMagick.CompositeOperator.Over);
+        collection.Add(page1.Clone());
+        
+        // Create page 2  
+        using var page2 = new ImageMagick.MagickImage(ImageMagick.MagickColors.Cyan, 150, 100);
+        using var overlay2 = new ImageMagick.MagickImage(ImageMagick.MagickColors.Orange, 40, 40);
+        page2.Composite(overlay2, 55, 30, ImageMagick.CompositeOperator.Over);
+        collection.Add(page2.Clone());
+        
+        collection.Write(path, ImageMagick.MagickFormat.Tiff);
+        return path;
+    }
 }
