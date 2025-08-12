@@ -170,6 +170,55 @@ function convertToHttpUrl(filePath) {
     return '';
 }
 
+// Poll for job completion
+async function pollForJobCompletion(jobId, maxAttempts = 120, intervalMs = 2000) {
+    let attempts = 0;
+    
+    while (attempts < maxAttempts) {
+        try {
+            const statusResponse = await fetch(`/api/imageprocessing/job/${jobId}/status`);
+            
+            if (statusResponse.ok) {
+                const statusData = await statusResponse.json();
+                
+                if (statusData.status === 'Completed') {
+                    // Job completed successfully, get the result
+                    const resultResponse = await fetch(`/api/imageprocessing/job/${jobId}/result`);
+                    
+                    if (resultResponse.ok) {
+                        return await resultResponse.json();
+                    } else {
+                        throw new Error('Failed to get job result');
+                    }
+                } else if (statusData.status === 'Failed') {
+                    throw new Error(statusData.errorMessage || 'Job failed');
+                }
+                
+                // Job is still processing, continue polling
+                // Progress updates are handled via SignalR
+            }
+            
+            // Wait before next poll
+            await new Promise(resolve => setTimeout(resolve, intervalMs));
+            attempts++;
+            
+        } catch (error) {
+            console.error('Error polling job status:', error);
+            
+            // If it's the last attempt, throw the error
+            if (attempts >= maxAttempts - 1) {
+                throw error;
+            }
+            
+            // Otherwise, wait and retry
+            await new Promise(resolve => setTimeout(resolve, intervalMs));
+            attempts++;
+        }
+    }
+    
+    throw new Error('Job polling timed out');
+}
+
 // API Helper functions
 async function apiCall(endpoint, options = {}) {
     const baseUrl = window.location.origin;
@@ -270,7 +319,7 @@ async function handleUpload(event) {
     clearImageViewer(imageViewer);
     
     // Show progress
-    showProgress(progressDiv, uploadBtn, 'Starting upload...');
+    showProgress(progressDiv, uploadBtn, 'Uploading file...');
     
     const renderStartTime = performance.now();
     let jobId = null;
@@ -289,23 +338,35 @@ async function handleUpload(event) {
             throw new Error(errorData.error || 'Upload failed');
         }
         
-        const responseData = await response.json();
-        jobId = responseData.jobId;
-        const result = responseData.result;
+        const uploadResponse = await response.json();
+        jobId = uploadResponse.jobId;
+        
+        // Show upload success and start progress monitoring
+        updateUploadProgress({
+            jobId: jobId,
+            status: 'Processing',
+            statusMessage: 'File uploaded successfully. Starting processing...',
+            progressPercentage: 0
+        });
         
         // Join the SignalR group to receive progress updates for this job
         if (progressConnection && jobId) {
             await progressConnection.invoke("JoinJob", jobId);
         }
         
-        // Calculate rendering time
-        const renderEndTime = performance.now();
-        const renderingTime = renderEndTime - renderStartTime;
-        result.renderingTime = formatDuration(renderingTime);
+        // Poll for job completion
+        const result = await pollForJobCompletion(jobId);
         
-        // Display results and images separately
-        displayProcessingResult(resultDiv, result);
-        displayImagesInViewer(imageViewer, [result], renderingTime);
+        if (result) {
+            // Calculate rendering time
+            const renderEndTime = performance.now();
+            const renderingTime = renderEndTime - renderStartTime;
+            result.renderingTime = formatDuration(renderingTime);
+            
+            // Display results and images
+            displayProcessingResult(resultDiv, result);
+            displayImagesInViewer(imageViewer, [result], renderingTime);
+        }
         
     } catch (error) {
         showError(resultDiv, `Upload failed: ${error.message}`);
