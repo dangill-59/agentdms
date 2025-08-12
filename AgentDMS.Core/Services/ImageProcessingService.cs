@@ -171,10 +171,9 @@ public class ImageProcessingService
             imageFile.ConvertedPngPath = pngPath;
             metrics.ConversionTime = DateTime.UtcNow - conversionStart;
 
-            // Thumbnail generation timing
+            // Use the PNG file directly instead of generating a thumbnail
             var thumbnailStart = DateTime.UtcNow;
-            var thumbnailPath = await GenerateThumbnailAsync(image, imageFile.FileName, cancellationToken);
-            imageFile.ThumbnailPath = thumbnailPath;
+            imageFile.ThumbnailPath = pngPath; // Point to the PNG file directly
             metrics.ThumbnailGenerationTime = DateTime.UtcNow - thumbnailStart;
 
             _logger?.LogDebug("Successfully processed single image: {FilePath}", imageFile.OriginalFilePath);
@@ -241,9 +240,8 @@ public class ImageProcessingService
                     PageCount = 1
                 };
 
-                // Generate thumbnail for each page using ImageSharp
-                using var imageSharpImage = await SixLabors.ImageSharp.Image.LoadAsync(pagePath, cancellationToken);
-                pageImage.ThumbnailPath = await GenerateThumbnailAsync(imageSharpImage, $"page_{frame + 1}_{imageFile.FileName}", cancellationToken);
+                // Use PNG file directly instead of generating thumbnails
+                pageImage.ThumbnailPath = pagePath; // Use the converted PNG directly
                 
                 splitPages.Add(pageImage);
                 _logger?.LogDebug("Generated page {PageNumber} for TIFF: {PagePath}", frame + 1, pagePath);
@@ -251,7 +249,7 @@ public class ImageProcessingService
             
             metrics.ConversionTime = DateTime.UtcNow - conversionStart;
 
-            // Generate thumbnail for the first page as main thumbnail
+            // Use the first page's PNG as the main thumbnail
             var thumbnailStart = DateTime.UtcNow;
             if (splitPages.Any())
             {
@@ -338,16 +336,15 @@ public class ImageProcessingService
                     CreatedDate = DateTime.UtcNow
                 };
 
-                // Generate thumbnail for each page using ImageSharp
-                using var imageSharpImage = await SixLabors.ImageSharp.Image.LoadAsync(pagePath, cancellationToken);
-                pageImage.ThumbnailPath = await GenerateThumbnailAsync(imageSharpImage, $"page_{pageNum + 1}_{imageFile.FileName}", cancellationToken);
+                // Use PNG file directly instead of generating thumbnails
+                pageImage.ThumbnailPath = pagePath; // Use the converted PNG directly
                 
                 splitPages.Add(pageImage);
                 _logger?.LogDebug("Generated page {PageNumber} for PDF: {PagePath}", pageNum + 1, pagePath);
             }
             metrics.ConversionTime = DateTime.UtcNow - conversionStart;
 
-            // Generate main thumbnail from the first page
+            // Use the first page's PNG as the main thumbnail
             var thumbnailStart = DateTime.UtcNow;
             if (splitPages.Any())
             {
@@ -366,54 +363,6 @@ public class ImageProcessingService
             _logger?.LogError(ex, "Error processing PDF file: {FilePath}", imageFile.OriginalFilePath);
             return ProcessingResult.Failed($"Error processing PDF: {ex.Message}", ex);
         }
-    }
-
-    private async Task<string> GenerateThumbnailAsync(SixLabors.ImageSharp.Image image, string originalFileName, CancellationToken cancellationToken)
-    {
-        const int thumbnailSize = 200;
-        const int supersamplingMultiplier = 3;
-        
-        var thumbnailPath = Path.Combine(_outputDirectory, 
-            $"thumb_{Path.GetFileNameWithoutExtension(originalFileName)}.png");
-
-        // Calculate super-sampling dimensions to maintain aspect ratio
-        var (superWidth, superHeight) = CalculateThumbnailDimensions(
-            image.Width, image.Height, thumbnailSize * supersamplingMultiplier);
-        
-        // Step 1: Render at high resolution with anti-aliasing
-        using var superSampledImage = image.Clone(x => x.Resize(new ResizeOptions
-        {
-            Size = new SixLabors.ImageSharp.Size(superWidth, superHeight),
-            Mode = ResizeMode.Max,
-            Sampler = KnownResamplers.Lanczos3, // High-quality upsampling
-            Compand = true // Enable gamma correction for better quality
-        }));
-        
-        // Step 2: Calculate final thumbnail dimensions
-        var (finalWidth, finalHeight) = CalculateThumbnailDimensions(
-            superSampledImage.Width, superSampledImage.Height, thumbnailSize);
-        
-        // Step 3: High-quality downscaling with Lanczos3 resampler
-        using var thumbnail = superSampledImage.Clone(x => x.Resize(new ResizeOptions
-        {
-            Size = new SixLabors.ImageSharp.Size(finalWidth, finalHeight),
-            Mode = ResizeMode.Max,
-            Sampler = KnownResamplers.Lanczos3, // High-quality downsampling preserves text clarity
-            Compand = true // Maintain gamma correction
-        }));
-
-        // Step 4: Save with high-quality PNG settings
-        var pngEncoder = new PngEncoder
-        {
-            CompressionLevel = PngCompressionLevel.Level1, // Minimal compression for quality
-            ColorType = PngColorType.Rgb, // Full RGB color, no palette reduction
-            BitDepth = PngBitDepth.Bit8, // 8-bit per channel for full color range
-            TransparentColorMode = PngTransparentColorMode.Preserve, // Preserve transparency if present
-            Gamma = 1.0f / 2.2f // Standard gamma for proper display
-        };
-
-        await thumbnail.SaveAsync(thumbnailPath, pngEncoder, cancellationToken);
-        return thumbnailPath;
     }
 
     /// <summary>

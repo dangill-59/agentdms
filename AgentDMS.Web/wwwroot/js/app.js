@@ -11,8 +11,8 @@ function init() {
     // Bind event handlers
     bindEventHandlers();
     
-    // Initialize thumbnail size controls
-    initializeThumbnailSizeControls();
+    // Initialize image zoom controls
+    initializeImageZoomControls();
 }
 
 function bindEventHandlers() {
@@ -26,72 +26,84 @@ function bindEventHandlers() {
     document.getElementById('galleryForm').addEventListener('submit', handleGalleryGeneration);
 }
 
-// Initialize thumbnail size controls
-function initializeThumbnailSizeControls() {
-    const savedSize = localStorage.getItem('thumbnailSize') || '120';
+// Initialize image zoom controls
+function initializeImageZoomControls() {
+    const savedZoom = localStorage.getItem('imageZoom') || '100';
     
-    // Single view slider
-    const singleSlider = document.getElementById('thumbnailSizeSlider');
-    const singleDisplay = document.getElementById('thumbnailSizeDisplay');
+    // Single view zoom slider
+    const singleSlider = document.getElementById('imageZoomSlider');
+    const singleDisplay = document.getElementById('imageZoomDisplay');
     
     if (singleSlider && singleDisplay) {
-        singleSlider.value = savedSize;
-        singleDisplay.textContent = savedSize + 'px';
+        singleSlider.value = savedZoom;
+        singleDisplay.textContent = savedZoom + '%';
         
         singleSlider.addEventListener('input', function() {
-            const size = this.value;
-            singleDisplay.textContent = size + 'px';
-            updateThumbnailSize('thumbnailViewer', size);
+            const zoom = this.value;
+            singleDisplay.textContent = zoom + '%';
+            updateImageZoom('imageViewer', zoom);
             
             // Also update the batch slider to keep them in sync
-            const batchSlider = document.getElementById('batchThumbnailSizeSlider');
-            const batchDisplay = document.getElementById('batchThumbnailSizeDisplay');
+            const batchSlider = document.getElementById('batchImageZoomSlider');
+            const batchDisplay = document.getElementById('batchImageZoomDisplay');
             if (batchSlider && batchDisplay) {
-                batchSlider.value = size;
-                batchDisplay.textContent = size + 'px';
-                updateThumbnailSize('batchThumbnailViewer', size);
+                batchSlider.value = zoom;
+                batchDisplay.textContent = zoom + '%';
+                updateImageZoom('batchImageViewer', zoom);
             }
             
-            localStorage.setItem('thumbnailSize', size);
+            localStorage.setItem('imageZoom', zoom);
         });
     }
     
-    // Batch view slider
-    const batchSlider = document.getElementById('batchThumbnailSizeSlider');
-    const batchDisplay = document.getElementById('batchThumbnailSizeDisplay');
+    // Batch view zoom slider
+    const batchSlider = document.getElementById('batchImageZoomSlider');
+    const batchDisplay = document.getElementById('batchImageZoomDisplay');
     
     if (batchSlider && batchDisplay) {
-        batchSlider.value = savedSize;
-        batchDisplay.textContent = savedSize + 'px';
+        batchSlider.value = savedZoom;
+        batchDisplay.textContent = savedZoom + '%';
         
         batchSlider.addEventListener('input', function() {
-            const size = this.value;
-            batchDisplay.textContent = size + 'px';
-            updateThumbnailSize('batchThumbnailViewer', size);
+            const zoom = this.value;
+            batchDisplay.textContent = zoom + '%';
+            updateImageZoom('batchImageViewer', zoom);
             
             // Also update the single slider to keep them in sync
-            const singleSlider = document.getElementById('thumbnailSizeSlider');
-            const singleDisplay = document.getElementById('thumbnailSizeDisplay');
+            const singleSlider = document.getElementById('imageZoomSlider');
+            const singleDisplay = document.getElementById('imageZoomDisplay');
             if (singleSlider && singleDisplay) {
-                singleSlider.value = size;
-                singleDisplay.textContent = size + 'px';
-                updateThumbnailSize('thumbnailViewer', size);
+                singleSlider.value = zoom;
+                singleDisplay.textContent = zoom + '%';
+                updateImageZoom('imageViewer', zoom);
             }
             
-            localStorage.setItem('thumbnailSize', size);
+            localStorage.setItem('imageZoom', zoom);
         });
     }
     
-    // Apply initial size to both viewers
-    updateThumbnailSize('thumbnailViewer', savedSize);
-    updateThumbnailSize('batchThumbnailViewer', savedSize);
+    // Apply initial zoom to both viewers
+    updateImageZoom('imageViewer', savedZoom);
+    updateImageZoom('batchImageViewer', savedZoom);
+    
+    // Initialize modal zoom slider
+    const modalSlider = document.getElementById('modalZoomSlider');
+    if (modalSlider) {
+        modalSlider.addEventListener('input', function() {
+            const zoom = this.value;
+            const modalImage = document.getElementById('modalImage');
+            if (modalImage) {
+                modalImage.style.transform = `scale(${zoom})`;
+            }
+        });
+    }
 }
 
-// Update thumbnail size for a specific viewer
-function updateThumbnailSize(viewerId, size) {
+// Update image zoom for a specific viewer
+function updateImageZoom(viewerId, zoom) {
     const viewer = document.getElementById(viewerId);
     if (viewer) {
-        viewer.style.setProperty('--thumbnail-size', size + 'px');
+        viewer.style.setProperty('--image-zoom', zoom);
     }
 }
 
@@ -208,16 +220,16 @@ async function handleUpload(event) {
     const uploadBtn = document.getElementById('uploadBtn');
     const progressDiv = document.getElementById('uploadProgress');
     const resultDiv = document.getElementById('uploadResult');
-    const thumbnailViewer = document.getElementById('thumbnailViewer');
+    const imageViewer = document.getElementById('imageViewer');
     
     if (!fileInput.files[0]) {
         showError(resultDiv, 'Please select a file to upload.');
         return;
     }
     
-    // Clear previous results and thumbnails
+    // Clear previous results and images
     resultDiv.innerHTML = '';
-    clearThumbnailViewer(thumbnailViewer);
+    clearImageViewer(imageViewer);
     
     // Show progress
     showProgress(progressDiv, uploadBtn, 'Processing image...');
@@ -245,9 +257,9 @@ async function handleUpload(event) {
         const renderingTime = renderEndTime - renderStartTime;
         result.renderingTime = formatDuration(renderingTime);
         
-        // Display results and thumbnails separately
+        // Display results and images separately
         displayProcessingResult(resultDiv, result);
-        displayThumbnailsInViewer(thumbnailViewer, [result], renderingTime);
+        displayImagesInViewer(imageViewer, [result], renderingTime);
         
     } catch (error) {
         showError(resultDiv, `Upload failed: ${error.message}`);
@@ -264,7 +276,7 @@ async function handleBatchProcess(event) {
     const batchBtn = document.getElementById('batchBtn');
     const progressDiv = document.getElementById('batchProgress');
     const resultDiv = document.getElementById('batchResult');
-    const thumbnailViewer = document.getElementById('batchThumbnailViewer');
+    const imageViewer = document.getElementById('batchImageViewer');
     
     const filePaths = pathsTextarea.value
         .split('\n')
@@ -276,9 +288,9 @@ async function handleBatchProcess(event) {
         return;
     }
     
-    // Clear previous results and thumbnails
+    // Clear previous results and images
     resultDiv.innerHTML = '';
-    clearThumbnailViewer(thumbnailViewer);
+    clearImageViewer(imageViewer);
     
     showProgress(progressDiv, batchBtn, 'Processing files...');
     
@@ -300,7 +312,7 @@ async function handleBatchProcess(event) {
         });
         
         displayBatchResults(resultDiv, results);
-        displayThumbnailsInViewer(thumbnailViewer, results, renderingTime);
+        displayImagesInViewer(imageViewer, results, renderingTime);
         
     } catch (error) {
         showError(resultDiv, `Batch processing failed: ${error.message}`);
@@ -315,7 +327,7 @@ async function handleGalleryGeneration(event) {
     
     const pathsTextarea = document.getElementById('galleryPaths');
     const titleInput = document.getElementById('galleryTitle');
-    const sizeSelect = document.getElementById('thumbnailSize');
+    const sizeSelect = document.getElementById('imageSize');
     const galleryBtn = document.getElementById('galleryBtn');
     const progressDiv = document.getElementById('galleryProgress');
     const resultDiv = document.getElementById('galleryResult');
@@ -520,42 +532,42 @@ function displayBatchResults(container, results) {
     container.innerHTML = html;
 }
 
-// Thumbnail viewer functions
-function clearThumbnailViewer(viewer) {
+// Image viewer functions
+function clearImageViewer(viewer) {
     viewer.innerHTML = `
         <div class="text-center text-muted">
             <i class="bi bi-image" style="font-size: 3rem;"></i>
-            <p class="mt-2">Thumbnails will appear here</p>
+            <p class="mt-2">Images will appear here</p>
         </div>
     `;
-    viewer.classList.remove('has-thumbnails');
+    viewer.classList.remove('has-images');
 }
 
-function displayThumbnailsInViewer(viewer, results, renderingTime) {
-    const thumbnails = [];
+function displayImagesInViewer(viewer, results, renderingTime) {
+    const images = [];
     
     results.forEach((result, index) => {
         if (result.success && result.processedImage) {
             const img = result.processedImage;
             
-            // Add main thumbnail
-            if (img.thumbnailPath) {
-                thumbnails.push({
+            // Add main image (PNG instead of thumbnail)
+            if (img.convertedPngPath || img.thumbnailPath) {
+                images.push({
                     name: img.fileName,
-                    path: img.thumbnailPath,
+                    path: img.convertedPngPath || img.thumbnailPath, // Use PNG file directly
                     processingTime: result.processingTime || '0ms',
                     renderingTime: result.renderingTime || '0ms',
                     isMain: true
                 });
             }
             
-            // Add split page thumbnails for multipage documents
+            // Add split page images for multipage documents
             if (img.isMultiPage && result.splitPages) {
                 result.splitPages.forEach((page, pageIndex) => {
-                    if (page.thumbnailPath) {
-                        thumbnails.push({
+                    if (page.convertedPngPath || page.thumbnailPath) {
+                        images.push({
                             name: `${img.fileName} - Page ${pageIndex + 1}`,
-                            path: page.thumbnailPath,
+                            path: page.convertedPngPath || page.thumbnailPath, // Use PNG file directly
                             processingTime: result.processingTime || '0ms',
                             renderingTime: result.renderingTime || '0ms',
                             isPage: true
@@ -566,38 +578,38 @@ function displayThumbnailsInViewer(viewer, results, renderingTime) {
         }
     });
     
-    if (thumbnails.length === 0) {
-        clearThumbnailViewer(viewer);
+    if (images.length === 0) {
+        clearImageViewer(viewer);
         return;
     }
     
-    viewer.classList.add('has-thumbnails');
+    viewer.classList.add('has-images');
     
     let html = `
         <div class="mb-2">
             <small class="text-muted">
-                <i class="bi bi-images"></i> ${thumbnails.length} thumbnail${thumbnails.length > 1 ? 's' : ''} generated
+                <i class="bi bi-images"></i> ${images.length} image${images.length > 1 ? 's' : ''} processed
             </small>
         </div>
-        <div class="thumbnail-grid">
+        <div class="image-grid">
     `;
     
-    thumbnails.forEach((thumb, index) => {
-        const httpUrl = convertToHttpUrl(thumb.path);
+    images.forEach((img, index) => {
+        const httpUrl = convertToHttpUrl(img.path);
         html += `
-            <div class="thumbnail-item" onclick="previewThumbnail('${httpUrl}', '${thumb.name}')">
+            <div class="image-item" onclick="openImageModal('${httpUrl}', '${img.name}')">
                 ${httpUrl ? `
-                    <img src="${httpUrl}" alt="${thumb.name}" 
-                         onerror="this.parentElement.innerHTML='<div class=\\'thumbnail-placeholder\\'><i class=\\'bi bi-image\\'></i></div>'">
+                    <img src="${httpUrl}" alt="${img.name}" 
+                         onerror="this.parentElement.innerHTML='<div class=\\'image-placeholder\\'><i class=\\'bi bi-image\\'></i></div>'">
                 ` : `
-                    <div class="thumbnail-placeholder">
+                    <div class="image-placeholder">
                         <i class="bi bi-image"></i>
                     </div>
                 `}
-                <div class="thumbnail-overlay">
-                    <div class="thumbnail-name">${thumb.name}</div>
-                    <div class="thumbnail-timing">
-                        P: ${formatDuration(thumb.processingTime)} | R: ${formatDuration(thumb.renderingTime)}
+                <div class="image-overlay">
+                    <div class="image-name">${img.name}</div>
+                    <div class="image-timing">
+                        P: ${formatDuration(img.processingTime)} | R: ${formatDuration(img.renderingTime)}
                     </div>
                 </div>
             </div>
@@ -608,11 +620,47 @@ function displayThumbnailsInViewer(viewer, results, renderingTime) {
     viewer.innerHTML = html;
 }
 
-function previewThumbnail(imagePath, imageName) {
-    // Create a modal or lightbox to preview the full image
-    // For now, we'll just show an alert with the image path
-    alert(`Preview: ${imageName}\\nPath: ${imagePath}`);
+// Image modal functions
+function openImageModal(imagePath, imageName) {
+    const modal = document.getElementById('imageModal');
+    const modalImage = document.getElementById('modalImage');
+    
+    if (modal && modalImage) {
+        modalImage.src = imagePath;
+        modalImage.alt = imageName;
+        modal.style.display = 'block';
+        resetModalZoom();
+        
+        // Prevent body scrolling when modal is open
+        document.body.style.overflow = 'hidden';
+    }
 }
+
+function closeImageModal() {
+    const modal = document.getElementById('imageModal');
+    if (modal) {
+        modal.style.display = 'none';
+        // Restore body scrolling
+        document.body.style.overflow = 'auto';
+    }
+}
+
+function resetModalZoom() {
+    const modalImage = document.getElementById('modalImage');
+    const modalSlider = document.getElementById('modalZoomSlider');
+    
+    if (modalImage && modalSlider) {
+        modalImage.style.transform = 'scale(1)';
+        modalSlider.value = 1;
+    }
+}
+
+// Add keyboard support for modal
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        closeImageModal();
+    }
+});
 
 function displayGalleryResult(container, result) {
     container.innerHTML = `
@@ -646,12 +694,14 @@ function showProgress(progressDiv, button, statusText = 'Processing...') {
     button.disabled = true;
     button.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Processing...';
     
-    // Update progress bar and status
+    // Update progress bar and status with indeterminate animation
     const progressBar = progressDiv.querySelector('.progress-bar');
     const statusDiv = progressDiv.querySelector('.progress-status');
     
     if (progressBar) {
-        progressBar.style.width = '50%';
+        // Add indeterminate animation class
+        progressBar.classList.add('progress-indeterminate');
+        progressBar.style.width = '100%';
     }
     
     if (statusDiv) {
@@ -665,7 +715,8 @@ function hideProgress(progressDiv, button, showComplete = true) {
     const statusDiv = progressDiv.querySelector('.progress-status');
     
     if (showComplete && progressBar && statusDiv) {
-        // Show completion animation
+        // Remove indeterminate animation and show completion
+        progressBar.classList.remove('progress-indeterminate');
         progressBar.style.width = '100%';
         statusDiv.textContent = 'Done!';
         statusDiv.className = 'progress-status complete';
@@ -678,7 +729,10 @@ function hideProgress(progressDiv, button, showComplete = true) {
             setTimeout(() => {
                 progressDiv.style.display = 'none';
                 // Reset for next time
-                if (progressBar) progressBar.style.width = '0%';
+                if (progressBar) {
+                    progressBar.style.width = '0%';
+                    progressBar.classList.remove('progress-indeterminate');
+                }
                 if (statusDiv) {
                     statusDiv.classList.remove('fade-out', 'complete', 'processing');
                     statusDiv.textContent = 'Processing...';
@@ -687,6 +741,11 @@ function hideProgress(progressDiv, button, showComplete = true) {
         }, 1500);
     } else {
         progressDiv.style.display = 'none';
+        // Reset progress bar
+        if (progressBar) {
+            progressBar.classList.remove('progress-indeterminate');
+            progressBar.style.width = '0%';
+        }
     }
     
     button.disabled = false;
