@@ -86,25 +86,25 @@
                             </div>
                         </div>
                         
-                        <!-- Thumbnail Viewer Panel -->
+                        <!-- Image Viewer Panel -->
                         <div class="col-md-4">
                             <div class="card">
                                 <div class="card-header">
-                                    <h5><i class="bi bi-images"></i> Thumbnail Viewer</h5>
+                                    <h5><i class="bi bi-images"></i> Image Viewer</h5>
                                 </div>
                                 <div class="card-body">
-                                    <!-- Thumbnail Size Slider -->
-                                    <div class="thumbnail-size-control mb-3">
-                                        <label for="thumbnailSizeSlider" class="form-label">
-                                            <small><i class="bi bi-zoom-in"></i> Thumbnail Size: <span id="thumbnailSizeDisplay">120px</span></small>
+                                    <!-- Image Zoom Control -->
+                                    <div class="image-zoom-control mb-3">
+                                        <label for="imageZoomSlider" class="form-label">
+                                            <small><i class="bi bi-zoom-in"></i> Zoom Level: <span id="imageZoomDisplay">100%</span></small>
                                         </label>
-                                        <input type="range" class="form-range" id="thumbnailSizeSlider" min="60" max="300" value="120">
+                                        <input type="range" class="form-range" id="imageZoomSlider" min="25" max="300" value="100" step="25">
                                     </div>
                                     
-                                    <div id="thumbnailViewer" class="thumbnail-viewer">
+                                    <div id="imageViewer" class="image-viewer">
                                         <div class="text-center text-muted">
                                             <i class="bi bi-image" style="font-size: 3rem;"></i>
-                                            <p class="mt-2">Thumbnails will appear here</p>
+                                            <p class="mt-2">Images will appear here</p>
                                         </div>
                                     </div>
                                 </div>
@@ -156,25 +156,25 @@
                             </div>
                         </div>
                         
-                        <!-- Batch Thumbnail Viewer Panel -->
+                        <!-- Batch Image Viewer Panel -->
                         <div class="col-md-4">
                             <div class="card">
                                 <div class="card-header">
-                                    <h5><i class="bi bi-images"></i> Batch Thumbnails</h5>
+                                    <h5><i class="bi bi-images"></i> Batch Images</h5>
                                 </div>
                                 <div class="card-body">
-                                    <!-- Batch Thumbnail Size Slider -->
-                                    <div class="thumbnail-size-control mb-3">
-                                        <label for="batchThumbnailSizeSlider" class="form-label">
-                                            <small><i class="bi bi-zoom-in"></i> Thumbnail Size: <span id="batchThumbnailSizeDisplay">120px</span></small>
+                                    <!-- Batch Image Zoom Control -->
+                                    <div class="image-zoom-control mb-3">
+                                        <label for="batchImageZoomSlider" class="form-label">
+                                            <small><i class="bi bi-zoom-in"></i> Zoom Level: <span id="batchImageZoomDisplay">100%</span></small>
                                         </label>
-                                        <input type="range" class="form-range" id="batchThumbnailSizeSlider" min="60" max="300" value="120">
+                                        <input type="range" class="form-range" id="batchImageZoomSlider" min="25" max="300" value="100" step="25">
                                     </div>
                                     
-                                    <div id="batchThumbnailViewer" class="thumbnail-viewer">
+                                    <div id="batchImageViewer" class="image-viewer">
                                         <div class="text-center text-muted">
                                             <i class="bi bi-grid-3x3" style="font-size: 3rem;"></i>
-                                            <p class="mt-2">Processed thumbnails will appear here</p>
+                                            <p class="mt-2">Processed images will appear here</p>
                                         </div>
                                     </div>
                                 </div>
@@ -189,7 +189,7 @@
                         <div class="col-md-8">
                             <div class="card">
                                 <div class="card-header">
-                                    <h5><i class="bi bi-grid-3x3"></i> Generate Thumbnail Gallery</h5>
+                                    <h5><i class="bi bi-grid-3x3"></i> Generate PNG Gallery</h5>
                                 </div>
                                 <div class="card-body">
                                     <form id="galleryForm">
@@ -205,8 +205,8 @@
                                                        value="AgentDMS Gallery" placeholder="Gallery Title">
                                             </div>
                                             <div class="col-md-6">
-                                                <label for="thumbnailSize" class="form-label">Thumbnail Size</label>
-                                                <select class="form-select" id="thumbnailSize">
+                                                <label for="imageSize" class="form-label">Gallery Image Size</label>
+                                                <select class="form-select" id="imageSize">
                                                     <option value="150">150px</option>
                                                     <option value="200" selected>200px</option>
                                                     <option value="300">300px</option>
@@ -263,9 +263,9 @@
                                         <ul class="list-unstyled">
                                             <li><i class="bi bi-check-circle text-success"></i> Multi-format Support: JPEG, PNG, BMP, GIF, TIFF, PDF, WebP</li>
                                             <li><i class="bi bi-check-circle text-success"></i> Multipage Processing: Automatically splits TIFF and PDF files</li>
-                                            <li><i class="bi bi-check-circle text-success"></i> PNG Conversion: Converts all formats to PNG</li>
-                                            <li><i class="bi bi-check-circle text-success"></i> Thumbnail Generation: Creates browser-friendly thumbnails</li>
-                                            <li><i class="bi bi-check-circle text-success"></i> HTML Gallery: Generates responsive thumbnail galleries</li>
+                                            <li><i class="bi bi-check-circle text-success"></i> PNG Conversion: Converts all formats to high-quality PNG</li>
+                                            <li><i class="bi bi-check-circle text-success"></i> Gallery Generation: Creates responsive image galleries with zoom</li>
+                                            <li><i class="bi bi-check-circle text-success"></i> Zoom Controls: Interactive zoom functionality for detailed viewing</li>
                                         </ul>
                                     </div>
                                 </div>
@@ -275,6 +275,21 @@
                 </div>
             </div>
         </main>
+    </div>
+
+    <!-- Image Modal/Lightbox -->
+    <div id="imageModal" class="image-modal" style="display: none;">
+        <div class="image-modal-overlay" onclick="closeImageModal()">
+            <div class="image-modal-close" onclick="closeImageModal()">&times;</div>
+            <div class="image-modal-content" onclick="event.stopPropagation()">
+                <img id="modalImage" src="" alt="" />
+                <div class="image-modal-controls">
+                    <span class="zoom-label">Zoom:</span>
+                    <input type="range" id="modalZoomSlider" class="zoom-slider" min="0.1" max="5" step="0.1" value="1" />
+                    <button onclick="resetModalZoom()" class="zoom-reset-btn">Reset</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Bootstrap JS -->

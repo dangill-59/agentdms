@@ -267,22 +267,21 @@ public class ImageProcessingServiceTests
         try
         {
             // Act
-            var thumbnailPath = await AgentDMS.Core.Utilities.ThumbnailGenerator.GenerateHighQualityThumbnailAsync(
-                testImagePath, outputDir, 200, "hq_test");
+            var pngPath = await AgentDMS.Core.Utilities.ThumbnailGenerator.ConvertToPngAsync(
+                testImagePath, outputDir, "png_test");
 
             // Assert
-            Assert.True(File.Exists(thumbnailPath), $"High-quality thumbnail should exist: {thumbnailPath}");
+            Assert.True(File.Exists(pngPath), $"PNG file should exist: {pngPath}");
             
             // Verify PNG properties
-            using var thumbnail = await SixLabors.ImageSharp.Image.LoadAsync(thumbnailPath);
-            Assert.True(thumbnail.Width <= 200 && thumbnail.Height <= 200, "Thumbnail dimensions should be within expected size");
-            Assert.True(thumbnail.Width > 0 && thumbnail.Height > 0, "Thumbnail should have valid dimensions");
+            using var pngImage = await SixLabors.ImageSharp.Image.LoadAsync(pngPath);
+            Assert.True(pngImage.Width > 0 && pngImage.Height > 0, "PNG should have valid dimensions");
             
-            // Verify file size is reasonable (high-quality should be larger than minimal compression)
-            var thumbnailInfo = new FileInfo(thumbnailPath);
-            Assert.True(thumbnailInfo.Length > 100, "High-quality thumbnail should have reasonable file size");
+            // Verify file size is reasonable
+            var pngInfo = new FileInfo(pngPath);
+            Assert.True(pngInfo.Length > 100, "PNG file should have reasonable file size");
             
-            Console.WriteLine($"High-quality thumbnail created: {thumbnail.Width}x{thumbnail.Height}, {thumbnailInfo.Length} bytes");
+            Console.WriteLine($"PNG file created: {pngImage.Width}x{pngImage.Height}, {pngInfo.Length} bytes");
         }
         finally
         {
@@ -311,34 +310,33 @@ public class ImageProcessingServiceTests
         
         try
         {
-            // Act - Generate high-quality thumbnail
-            var hqThumbnailPath = await AgentDMS.Core.Utilities.ThumbnailGenerator.GenerateHighQualityThumbnailAsync(
-                testImagePath, outputDir, 200, "hq_comparison");
+            // Act - Convert to PNG
+            var pngPath = await AgentDMS.Core.Utilities.ThumbnailGenerator.ConvertToPngAsync(
+                testImagePath, outputDir, "png_comparison");
 
-            // Act - Generate regular thumbnail for comparison using old method simulation
-            var regularThumbnailPath = Path.Combine(outputDir, "regular_comparison.png");
+            // Act - Create a smaller version for comparison
+            var smallerPngPath = Path.Combine(outputDir, "smaller_comparison.png");
             using var originalImage = await SixLabors.ImageSharp.Image.LoadAsync(testImagePath);
-            using var regularThumbnail = originalImage.Clone(x => x.Resize(new SixLabors.ImageSharp.Processing.ResizeOptions
+            using var smallerImage = originalImage.Clone(x => x.Resize(new SixLabors.ImageSharp.Processing.ResizeOptions
             {
                 Size = new SixLabors.ImageSharp.Size(200, 200),
                 Mode = SixLabors.ImageSharp.Processing.ResizeMode.Max
             }));
-            await regularThumbnail.SaveAsPngAsync(regularThumbnailPath);
+            await smallerImage.SaveAsPngAsync(smallerPngPath);
 
-            // Assert - Compare quality indicators
-            var hqInfo = new FileInfo(hqThumbnailPath);
-            var regularInfo = new FileInfo(regularThumbnailPath);
+            // Assert - Compare file information
+            var pngInfo = new FileInfo(pngPath);
+            var smallerInfo = new FileInfo(smallerPngPath);
             
-            Assert.True(File.Exists(hqThumbnailPath), "High-quality thumbnail should exist");
-            Assert.True(File.Exists(regularThumbnailPath), "Regular thumbnail should exist");
-            
-            // High-quality should typically be larger due to better encoding settings
-            Console.WriteLine($"High-quality thumbnail: {hqInfo.Length} bytes");
-            Console.WriteLine($"Regular thumbnail: {regularInfo.Length} bytes");
+            Assert.True(File.Exists(pngPath), "PNG file should exist");
+            Assert.True(File.Exists(smallerPngPath), "Smaller PNG file should exist");
             
             // Both should have reasonable sizes
-            Assert.True(hqInfo.Length > 100, "High-quality thumbnail should have reasonable size");
-            Assert.True(regularInfo.Length > 100, "Regular thumbnail should have reasonable size");
+            Console.WriteLine($"Full PNG: {pngInfo.Length} bytes");
+            Console.WriteLine($"Smaller PNG: {smallerInfo.Length} bytes");
+            
+            Assert.True(pngInfo.Length > 100, "PNG file should have reasonable size");
+            Assert.True(smallerInfo.Length > 100, "Smaller PNG file should have reasonable size");
         }
         finally
         {
