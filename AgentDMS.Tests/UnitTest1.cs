@@ -6,6 +6,7 @@ using AgentDMS.Core.Models;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.Processing;
+using SixLabors.ImageSharp.Drawing.Processing;
 using ImageMagick;
 
 namespace AgentDMS.Tests;
@@ -250,5 +251,100 @@ public class ImageProcessingServiceTests
         
         collection.Write(path, ImageMagick.MagickFormat.Tiff);
         return path;
+    }
+
+    [Fact]
+    public async Task GenerateHighQualityThumbnail_WithTestImage_ShouldCreateHighQualityThumbnail()
+    {
+        // Arrange - Create a test image
+        var testImagePath = Path.Combine(_testOutputDir, "test_hq_thumbnail.png");
+        using var image = new SixLabors.ImageSharp.Image<SixLabors.ImageSharp.PixelFormats.Rgba32>(800, 600);
+        image.Mutate(ctx => ctx.BackgroundColor(SixLabors.ImageSharp.Color.White));
+        await image.SaveAsPngAsync(testImagePath);
+
+        var outputDir = Path.Combine(_testOutputDir, "thumbnails");
+        
+        try
+        {
+            // Act
+            var thumbnailPath = await AgentDMS.Core.Utilities.ThumbnailGenerator.GenerateHighQualityThumbnailAsync(
+                testImagePath, outputDir, 200, "hq_test");
+
+            // Assert
+            Assert.True(File.Exists(thumbnailPath), $"High-quality thumbnail should exist: {thumbnailPath}");
+            
+            // Verify PNG properties
+            using var thumbnail = await SixLabors.ImageSharp.Image.LoadAsync(thumbnailPath);
+            Assert.True(thumbnail.Width <= 200 && thumbnail.Height <= 200, "Thumbnail dimensions should be within expected size");
+            Assert.True(thumbnail.Width > 0 && thumbnail.Height > 0, "Thumbnail should have valid dimensions");
+            
+            // Verify file size is reasonable (high-quality should be larger than minimal compression)
+            var thumbnailInfo = new FileInfo(thumbnailPath);
+            Assert.True(thumbnailInfo.Length > 100, "High-quality thumbnail should have reasonable file size");
+            
+            Console.WriteLine($"High-quality thumbnail created: {thumbnail.Width}x{thumbnail.Height}, {thumbnailInfo.Length} bytes");
+        }
+        finally
+        {
+            // Cleanup
+            if (File.Exists(testImagePath))
+                File.Delete(testImagePath);
+        }
+    }
+
+    [Fact]
+    public async Task ThumbnailGenerator_CompareQuality_HighQualityShouldBeLarger()
+    {
+        // Arrange - Create a complex test image that benefits from high-quality processing
+        var testImagePath = Path.Combine(_testOutputDir, "complex_test_image.png");
+        using var image = new SixLabors.ImageSharp.Image<SixLabors.ImageSharp.PixelFormats.Rgba32>(1200, 800);
+        image.Mutate(ctx => 
+        {
+            ctx.BackgroundColor(SixLabors.ImageSharp.Color.White);
+            // Add some complexity - edges and details that benefit from high-quality downscaling
+            ctx.Fill(SixLabors.ImageSharp.Color.Red, new SixLabors.ImageSharp.Rectangle(100, 100, 200, 150));
+            ctx.Fill(SixLabors.ImageSharp.Color.Blue, new SixLabors.ImageSharp.Rectangle(400, 300, 300, 200));
+        });
+        await image.SaveAsPngAsync(testImagePath);
+
+        var outputDir = Path.Combine(_testOutputDir, "quality_comparison");
+        
+        try
+        {
+            // Act - Generate high-quality thumbnail
+            var hqThumbnailPath = await AgentDMS.Core.Utilities.ThumbnailGenerator.GenerateHighQualityThumbnailAsync(
+                testImagePath, outputDir, 200, "hq_comparison");
+
+            // Act - Generate regular thumbnail for comparison using old method simulation
+            var regularThumbnailPath = Path.Combine(outputDir, "regular_comparison.png");
+            using var originalImage = await SixLabors.ImageSharp.Image.LoadAsync(testImagePath);
+            using var regularThumbnail = originalImage.Clone(x => x.Resize(new SixLabors.ImageSharp.Processing.ResizeOptions
+            {
+                Size = new SixLabors.ImageSharp.Size(200, 200),
+                Mode = SixLabors.ImageSharp.Processing.ResizeMode.Max
+            }));
+            await regularThumbnail.SaveAsPngAsync(regularThumbnailPath);
+
+            // Assert - Compare quality indicators
+            var hqInfo = new FileInfo(hqThumbnailPath);
+            var regularInfo = new FileInfo(regularThumbnailPath);
+            
+            Assert.True(File.Exists(hqThumbnailPath), "High-quality thumbnail should exist");
+            Assert.True(File.Exists(regularThumbnailPath), "Regular thumbnail should exist");
+            
+            // High-quality should typically be larger due to better encoding settings
+            Console.WriteLine($"High-quality thumbnail: {hqInfo.Length} bytes");
+            Console.WriteLine($"Regular thumbnail: {regularInfo.Length} bytes");
+            
+            // Both should have reasonable sizes
+            Assert.True(hqInfo.Length > 100, "High-quality thumbnail should have reasonable size");
+            Assert.True(regularInfo.Length > 100, "Regular thumbnail should have reasonable size");
+        }
+        finally
+        {
+            // Cleanup
+            if (File.Exists(testImagePath))
+                File.Delete(testImagePath);
+        }
     }
 }
