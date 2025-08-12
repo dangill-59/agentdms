@@ -37,20 +37,26 @@ public class ImageProcessingService
     /// <summary>
     /// Process a single image file asynchronously
     /// </summary>
-    public async Task<ProcessingResult> ProcessImageAsync(string filePath, CancellationToken cancellationToken = default)
+    public async Task<ProcessingResult> ProcessImageAsync(string filePath, DetailedProgressReporter? progressReporter = null, CancellationToken cancellationToken = default)
     {
         await _semaphore.WaitAsync(cancellationToken);
         
         try
         {
+            var fileName = Path.GetFileName(filePath);
+            await progressReporter?.ReportProgress(fileName, ProgressStatus.Starting, "Starting processing...");
+            
             var overallStart = DateTime.UtcNow;
             var metrics = new ProcessingMetrics { StartTime = overallStart };
             
             if (!File.Exists(filePath))
             {
+                await progressReporter?.ReportProgress(fileName, ProgressStatus.Failed, "File not found", errorMessage: $"File not found: {filePath}");
                 return ProcessingResult.Failed($"File not found: {filePath}");
             }
 
+            await progressReporter?.ReportProgress(fileName, ProgressStatus.LoadingFile, "Loading file...");
+            
             // File load timing
             var fileLoadStart = DateTime.UtcNow;
             var fileInfo = new FileInfo(filePath);
@@ -68,16 +74,18 @@ public class ImageProcessingService
             var extension = Path.GetExtension(filePath).ToLowerInvariant();
             imageFile.OriginalFormat = extension;
 
+            await progressReporter?.ReportProgress(fileName, ProgressStatus.ProcessingFile, $"Processing {extension.ToUpper()} file...");
+
             ProcessingResult result;
             
             switch (extension)
             {
                 case ".pdf":
-                    result = await ProcessPdfAsync(imageFile, metrics, cancellationToken);
+                    result = await ProcessPdfAsync(imageFile, metrics, progressReporter, cancellationToken);
                     break;
                 case ".tif":
                 case ".tiff":
-                    result = await ProcessMultipageTiffAsync(imageFile, metrics, cancellationToken);
+                    result = await ProcessMultipageTiffAsync(imageFile, metrics, progressReporter, cancellationToken);
                     break;
                 case ".jpg":
                 case ".jpeg":
@@ -85,9 +93,10 @@ public class ImageProcessingService
                 case ".bmp":
                 case ".gif":
                 case ".webp":
-                    result = await ProcessSingleImageAsync(imageFile, metrics, cancellationToken);
+                    result = await ProcessSingleImageAsync(imageFile, metrics, progressReporter, cancellationToken);
                     break;
                 default:
+                    await progressReporter?.ReportProgress(fileName, ProgressStatus.Failed, "Unsupported format", errorMessage: $"Unsupported file format: {extension}");
                     result = ProcessingResult.Failed($"Unsupported file format: {extension}");
                     break;
             }
@@ -98,12 +107,16 @@ public class ImageProcessingService
                 result.ProcessingTime = totalTime;
                 metrics.TotalProcessingTime = totalTime;
                 result.Metrics = metrics;
+                
+                await progressReporter?.ReportProgress(fileName, ProgressStatus.Completed, "Processing completed successfully");
             }
 
             return result;
         }
         catch (Exception ex)
         {
+            var fileName = Path.GetFileName(filePath);
+            await progressReporter?.ReportProgress(fileName, ProgressStatus.Failed, "Processing failed", errorMessage: ex.Message);
             return ProcessingResult.Failed($"Error processing {filePath}: {ex.Message}", ex);
         }
         finally
@@ -117,12 +130,14 @@ public class ImageProcessingService
     /// </summary>
     public async Task<List<ProcessingResult>> ProcessMultipleImagesAsync(
         IEnumerable<string> filePaths, 
+        DetailedProgressReporter? progressReporter = null,
         IProgress<int>? progress = null,
         CancellationToken cancellationToken = default)
     {
         var filePathsList = filePaths.ToList();
         var results = new List<ProcessingResult>();
         var processedCount = 0;
+        var totalFiles = filePathsList.Count;
 
         // Process files in batches to control concurrency more effectively
         var batchSize = Math.Min(_semaphore.CurrentCount, _semaphore.CurrentCount); // Use semaphore limit as batch size
@@ -133,11 +148,29 @@ public class ImageProcessingService
         for (int i = 0; i < filePathsList.Count; i += actualBatchSize)
         {
             var batch = filePathsList.Skip(i).Take(actualBatchSize);
-            var batchTasks = batch.Select(async filePath =>
+            var batchTasks = batch.Select(async (filePath, batchIndex) =>
             {
-                var result = await ProcessImageAsync(filePath, cancellationToken);
+                var fileIndex = i + batchIndex + 1; // 1-based indexing for display
+                var fileName = Path.GetFileName(filePath);
+                
+                // Create a file-specific progress reporter that includes batch context
+                DetailedProgressReporter? fileProgressReporter = null;
+                if (progressReporter != null)
+                {
+                    fileProgressReporter = new DetailedProgressReporter(progressReporter.JobId, async (fileProgress) =>
+                    {
+                        // Update progress with batch context
+                        fileProgress.CurrentFile = fileIndex;
+                        fileProgress.TotalFiles = totalFiles;
+                        await progressReporter.OnProgress(fileProgress);
+                    });
+                }
+                
+                var result = await ProcessImageAsync(filePath, fileProgressReporter, cancellationToken);
+                
                 Interlocked.Increment(ref processedCount);
                 progress?.Report(processedCount);
+                
                 return result;
             });
 
@@ -148,11 +181,13 @@ public class ImageProcessingService
         return results;
     }
 
-    private async Task<ProcessingResult> ProcessSingleImageAsync(ImageFile imageFile, ProcessingMetrics metrics, CancellationToken cancellationToken)
+    private async Task<ProcessingResult> ProcessSingleImageAsync(ImageFile imageFile, ProcessingMetrics metrics, DetailedProgressReporter? progressReporter, CancellationToken cancellationToken)
     {
         try
         {
             _logger?.LogInformation("Processing single image: {FilePath}", imageFile.OriginalFilePath);
+            
+            await progressReporter?.ReportProgress(imageFile.FileName, ProgressStatus.LoadingFile, "Decoding image...", 1, 1, 1, 1);
             
             // Image decode timing
             var decodeStart = DateTime.UtcNow;
@@ -163,6 +198,8 @@ public class ImageProcessingService
             imageFile.Height = image.Height;
             imageFile.IsMultiPage = false;
             imageFile.PageCount = 1;
+
+            await progressReporter?.ReportProgress(imageFile.FileName, ProgressStatus.ConvertingPage, "Converting to PNG...", 1, 1, 1, 1);
 
             // Conversion timing
             var conversionStart = DateTime.UtcNow;
@@ -182,15 +219,18 @@ public class ImageProcessingService
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Error processing single image: {FilePath}", imageFile.OriginalFilePath);
+            await progressReporter?.ReportProgress(imageFile.FileName, ProgressStatus.Failed, "Failed to process image", 1, 1, 1, 1, ex.Message);
             return ProcessingResult.Failed($"Error processing single image: {ex.Message}", ex);
         }
     }
 
-    private async Task<ProcessingResult> ProcessMultipageTiffAsync(ImageFile imageFile, ProcessingMetrics metrics, CancellationToken cancellationToken)
+    private async Task<ProcessingResult> ProcessMultipageTiffAsync(ImageFile imageFile, ProcessingMetrics metrics, DetailedProgressReporter? progressReporter, CancellationToken cancellationToken)
     {
         try
         {
             _logger?.LogInformation("Processing TIFF file: {FilePath}", imageFile.OriginalFilePath);
+            
+            await progressReporter?.ReportProgress(imageFile.FileName, ProgressStatus.LoadingFile, "Reading TIFF pages...", 1, 1, 1, 1);
             
             // Image decode timing
             var decodeStart = DateTime.UtcNow;
@@ -217,6 +257,9 @@ public class ImageProcessingService
             for (int frame = 0; frame < frameCount; frame++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                
+                await progressReporter?.ReportProgress(imageFile.FileName, ProgressStatus.ConvertingPage, 
+                    $"Converting page {frame + 1} of {frameCount}...", 1, 1, frame + 1, frameCount);
                 
                 var magickImage = magickImageCollection[frame];
                 var pagePath = Path.Combine(_outputDirectory, 
@@ -266,15 +309,18 @@ public class ImageProcessingService
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Error processing TIFF file: {FilePath}", imageFile.OriginalFilePath);
+            await progressReporter?.ReportProgress(imageFile.FileName, ProgressStatus.Failed, "Failed to process TIFF", 1, 1, 1, 1, ex.Message);
             return ProcessingResult.Failed($"Error processing TIFF: {ex.Message}", ex);
         }
     }
 
-    private async Task<ProcessingResult> ProcessPdfAsync(ImageFile imageFile, ProcessingMetrics metrics, CancellationToken cancellationToken)
+    private async Task<ProcessingResult> ProcessPdfAsync(ImageFile imageFile, ProcessingMetrics metrics, DetailedProgressReporter? progressReporter, CancellationToken cancellationToken)
     {
         try
         {
             _logger?.LogInformation("Processing PDF file: {FilePath}", imageFile.OriginalFilePath);
+            
+            await progressReporter?.ReportProgress(imageFile.FileName, ProgressStatus.LoadingFile, "Reading PDF pages...", 1, 1, 1, 1);
             
             var decodeStart = DateTime.UtcNow;
             
@@ -308,6 +354,9 @@ public class ImageProcessingService
             for (int pageNum = 0; pageNum < pageCount; pageNum++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                
+                await progressReporter?.ReportProgress(imageFile.FileName, ProgressStatus.ConvertingPage,
+                    $"Converting page {pageNum + 1} of {pageCount}...", 1, 1, pageNum + 1, pageCount);
                 
                 var magickImage = magickImageCollection[pageNum];
                 var pagePath = Path.Combine(_outputDirectory,
@@ -361,6 +410,7 @@ public class ImageProcessingService
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Error processing PDF file: {FilePath}", imageFile.OriginalFilePath);
+            await progressReporter?.ReportProgress(imageFile.FileName, ProgressStatus.Failed, "Failed to process PDF", 1, 1, 1, 1, ex.Message);
             return ProcessingResult.Failed($"Error processing PDF: {ex.Message}", ex);
         }
     }

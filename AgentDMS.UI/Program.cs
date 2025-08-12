@@ -168,7 +168,7 @@ class Program
         });
 
         var startTime = DateTime.UtcNow;
-        var results = await _imageProcessor.ProcessMultipleImagesAsync(files, progress);
+        var results = await _imageProcessor.ProcessMultipleImagesAsync(files, null, progress);
         var processingTime = DateTime.UtcNow - startTime;
 
         Console.WriteLine($"\n\nBatch processing completed in {processingTime.TotalSeconds:F2} seconds");
@@ -382,7 +382,7 @@ class Program
         });
 
         var startTime = DateTime.UtcNow;
-        var results = await _imageProcessor.ProcessMultipleImagesAsync(files, progress);
+        var results = await _imageProcessor.ProcessMultipleImagesAsync(files, null, progress);
         var processingTime = DateTime.UtcNow - startTime;
 
         Console.WriteLine($"\n\nBatch processing completed in {processingTime.TotalSeconds:F2} seconds");

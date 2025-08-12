@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using AgentDMS.Core.Services;
 using AgentDMS.Core.Models;
 using AgentDMS.Core.Utilities;
+using AgentDMS.Web.Hubs;
 using System.ComponentModel.DataAnnotations;
 
 namespace AgentDMS.Web.Controllers;
@@ -12,15 +13,18 @@ public class ImageProcessingController : ControllerBase
 {
     private readonly ImageProcessingService _imageProcessor;
     private readonly FileUploadService _fileUploadService;
+    private readonly IProgressBroadcaster _progressBroadcaster;
     private readonly ILogger<ImageProcessingController> _logger;
 
     public ImageProcessingController(
         ImageProcessingService imageProcessor, 
         FileUploadService fileUploadService,
+        IProgressBroadcaster progressBroadcaster,
         ILogger<ImageProcessingController> logger)
     {
         _imageProcessor = imageProcessor;
         _fileUploadService = fileUploadService;
+        _progressBroadcaster = progressBroadcaster;
         _logger = logger;
     }
 
@@ -38,6 +42,8 @@ public class ImageProcessingController : ControllerBase
             return BadRequest(new { error = "No file uploaded" });
         }
 
+        var jobId = Guid.NewGuid().ToString();
+
         try
         {
             // Save uploaded file temporarily
@@ -51,17 +57,34 @@ public class ImageProcessingController : ControllerBase
                 await file.CopyToAsync(stream);
             }
 
-            // Process the image
-            var result = await _imageProcessor.ProcessImageAsync(tempFilePath);
+            // Create progress reporter for real-time updates
+            var progressReporter = new DetailedProgressReporter(jobId, async (progress) =>
+            {
+                await _progressBroadcaster.BroadcastProgress(jobId, progress);
+            });
+
+            // Process the image with progress updates
+            var result = await _imageProcessor.ProcessImageAsync(tempFilePath, progressReporter);
             
             // Clean up temp file
             System.IO.File.Delete(tempFilePath);
 
-            return Ok(result);
+            // Add job ID to response
+            return Ok(new { jobId, result });
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error processing uploaded file");
+            
+            // Report failure via SignalR
+            await _progressBroadcaster.BroadcastProgress(jobId, new ProgressReport
+            {
+                JobId = jobId,
+                Status = ProgressStatus.Failed,
+                StatusMessage = "Processing failed",
+                ErrorMessage = ex.Message
+            });
+            
             return StatusCode(500, new { error = "Internal server error", message = ex.Message });
         }
     }
@@ -79,14 +102,33 @@ public class ImageProcessingController : ControllerBase
             return NotFound(new { error = "File not found" });
         }
 
+        var jobId = Guid.NewGuid().ToString();
+
         try
         {
-            var result = await _imageProcessor.ProcessImageAsync(request.FilePath);
-            return Ok(result);
+            // Create progress reporter for real-time updates
+            var progressReporter = new DetailedProgressReporter(jobId, async (progress) =>
+            {
+                await _progressBroadcaster.BroadcastProgress(jobId, progress);
+            });
+
+            var result = await _imageProcessor.ProcessImageAsync(request.FilePath, progressReporter);
+            
+            return Ok(new { jobId, result });
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error processing file: {FilePath}", request.FilePath);
+            
+            // Report failure via SignalR
+            await _progressBroadcaster.BroadcastProgress(jobId, new ProgressReport
+            {
+                JobId = jobId,
+                Status = ProgressStatus.Failed,
+                StatusMessage = "Processing failed",
+                ErrorMessage = ex.Message
+            });
+            
             return StatusCode(500, new { error = "Internal server error", message = ex.Message });
         }
     }
@@ -99,20 +141,51 @@ public class ImageProcessingController : ControllerBase
             return BadRequest(new { error = "File paths are required" });
         }
 
+        var jobId = Guid.NewGuid().ToString();
+
         try
         {
+            var filePathsList = request.FilePaths.ToList();
+            
             var progress = new Progress<int>(processed => 
             {
-                // In a real implementation, you might want to use SignalR for real-time progress updates
-                _logger.LogInformation("Processed {Count} files", processed);
+                _logger.LogInformation("Batch job {JobId}: Processed {Count}/{Total} files", jobId, processed, filePathsList.Count);
             });
 
-            var results = await _imageProcessor.ProcessMultipleImagesAsync(request.FilePaths, progress);
-            return Ok(results);
+            // Create progress reporter for real-time updates
+            var progressReporter = new DetailedProgressReporter(jobId, async (progressReport) =>
+            {
+                await _progressBroadcaster.BroadcastProgress(jobId, progressReport);
+            });
+
+            var results = await _imageProcessor.ProcessMultipleImagesAsync(filePathsList, progressReporter, progress);
+            
+            // Report completion
+            await _progressBroadcaster.BroadcastProgress(jobId, new ProgressReport
+            {
+                JobId = jobId,
+                Status = ProgressStatus.Completed,
+                StatusMessage = "Batch processing completed",
+                CurrentFile = filePathsList.Count,
+                TotalFiles = filePathsList.Count,
+                ProgressPercentage = 100
+            });
+
+            return Ok(new { jobId, results });
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error processing multiple files");
+            
+            // Report failure via SignalR
+            await _progressBroadcaster.BroadcastProgress(jobId, new ProgressReport
+            {
+                JobId = jobId,
+                Status = ProgressStatus.Failed,
+                StatusMessage = "Batch processing failed",
+                ErrorMessage = ex.Message
+            });
+            
             return StatusCode(500, new { error = "Internal server error", message = ex.Message });
         }
     }
