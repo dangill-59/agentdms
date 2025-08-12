@@ -1,4 +1,5 @@
 using AgentDMS.Core.Services;
+using AgentDMS.Web.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -7,11 +8,15 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// Add SignalR
+builder.Services.AddSignalR();
+
 // Add AgentDMS Core services
 builder.Services.AddSingleton<ImageProcessingService>();
 builder.Services.AddSingleton<FileUploadService>();
+builder.Services.AddScoped<IProgressBroadcaster, SignalRProgressBroadcaster>();
 
-// Configure CORS to allow all origins for development
+// Configure CORS to allow all origins for development (updated for SignalR)
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(builder =>
@@ -19,6 +24,15 @@ builder.Services.AddCors(options =>
         builder.AllowAnyOrigin()
                .AllowAnyMethod()
                .AllowAnyHeader();
+    });
+    
+    // Add specific policy for SignalR
+    options.AddPolicy("SignalRPolicy", builder =>
+    {
+        builder.WithOrigins("http://localhost", "https://localhost")
+               .AllowAnyMethod()
+               .AllowAnyHeader()
+               .AllowCredentials();
     });
 });
 
@@ -46,6 +60,9 @@ app.UseStaticFiles(new StaticFileOptions
 
 app.UseRouting();
 app.MapControllers();
+
+// Map SignalR hub
+app.MapHub<ProgressHub>("/progressHub");
 
 // Serve the main HTML page at root
 app.MapGet("/", () => Results.File("index.html", "text/html"));

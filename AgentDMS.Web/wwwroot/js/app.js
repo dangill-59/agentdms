@@ -1,10 +1,15 @@
 // AgentDMS Web UI JavaScript
+let progressConnection = null;
+
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize the application
     init();
 });
 
-function init() {
+async function init() {
+    // Initialize SignalR connection
+    await initializeSignalR();
+    
     // Load supported formats
     loadSupportedFormats();
     
@@ -13,6 +18,39 @@ function init() {
     
     // Initialize image zoom controls
     initializeImageZoomControls();
+}
+
+// Initialize SignalR connection for real-time progress updates
+async function initializeSignalR() {
+    try {
+        progressConnection = new signalR.HubConnectionBuilder()
+            .withUrl("/progressHub")
+            .build();
+
+        progressConnection.on("ProgressUpdate", handleProgressUpdate);
+
+        await progressConnection.start();
+        console.log("SignalR connection established for real-time progress updates");
+    } catch (error) {
+        console.error("Error establishing SignalR connection:", error);
+    }
+}
+
+// Handle real-time progress updates from SignalR
+function handleProgressUpdate(progress) {
+    console.log("Progress update received:", progress);
+    
+    // Update the appropriate progress display based on the active tab
+    const activeTab = document.querySelector('.nav-link.active');
+    if (activeTab) {
+        const targetTab = activeTab.getAttribute('data-bs-target');
+        
+        if (targetTab === '#upload') {
+            updateUploadProgress(progress);
+        } else if (targetTab === '#batch') {
+            updateBatchProgress(progress);
+        }
+    }
 }
 
 function bindEventHandlers() {
@@ -232,9 +270,10 @@ async function handleUpload(event) {
     clearImageViewer(imageViewer);
     
     // Show progress
-    showProgress(progressDiv, uploadBtn, 'Processing image...');
+    showProgress(progressDiv, uploadBtn, 'Starting upload...');
     
     const renderStartTime = performance.now();
+    let jobId = null;
     
     try {
         const formData = new FormData();
@@ -250,7 +289,14 @@ async function handleUpload(event) {
             throw new Error(errorData.error || 'Upload failed');
         }
         
-        const result = await response.json();
+        const responseData = await response.json();
+        jobId = responseData.jobId;
+        const result = responseData.result;
+        
+        // Join the SignalR group to receive progress updates for this job
+        if (progressConnection && jobId) {
+            await progressConnection.invoke("JoinJob", jobId);
+        }
         
         // Calculate rendering time
         const renderEndTime = performance.now();
@@ -265,6 +311,11 @@ async function handleUpload(event) {
         showError(resultDiv, `Upload failed: ${error.message}`);
     } finally {
         hideProgress(progressDiv, uploadBtn);
+        
+        // Leave the SignalR group
+        if (progressConnection && jobId) {
+            await progressConnection.invoke("LeaveJob", jobId);
+        }
     }
 }
 
@@ -292,15 +343,33 @@ async function handleBatchProcess(event) {
     resultDiv.innerHTML = '';
     clearImageViewer(imageViewer);
     
-    showProgress(progressDiv, batchBtn, 'Processing files...');
+    showProgress(progressDiv, batchBtn, 'Starting batch processing...');
     
     const renderStartTime = performance.now();
+    let jobId = null;
     
     try {
-        const results = await apiCall('imageprocessing/batch-process', {
+        const response = await fetch('/api/imageprocessing/batch-process', {
             method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
             body: JSON.stringify({ filePaths })
         });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Batch processing failed');
+        }
+        
+        const responseData = await response.json();
+        jobId = responseData.jobId;
+        const results = responseData.results;
+        
+        // Join the SignalR group to receive progress updates for this job
+        if (progressConnection && jobId) {
+            await progressConnection.invoke("JoinJob", jobId);
+        }
         
         // Calculate rendering time
         const renderEndTime = performance.now();
@@ -318,6 +387,11 @@ async function handleBatchProcess(event) {
         showError(resultDiv, `Batch processing failed: ${error.message}`);
     } finally {
         hideProgress(progressDiv, batchBtn);
+        
+        // Leave the SignalR group
+        if (progressConnection && jobId) {
+            await progressConnection.invoke("LeaveJob", jobId);
+        }
     }
 }
 
@@ -806,4 +880,100 @@ function formatDuration(duration) {
     
     // Default fallback
     return duration || '0.00s';
+}
+
+// Real-time progress update functions
+function updateUploadProgress(progress) {
+    const progressDiv = document.getElementById('uploadProgress');
+    const progressBar = progressDiv?.querySelector('.progress-bar');
+    const statusDiv = document.getElementById('uploadProgressStatus');
+    
+    if (!progressDiv || !progressBar || !statusDiv) return;
+    
+    // Show progress div if hidden
+    progressDiv.style.display = 'block';
+    
+    // Update progress bar
+    if (progress.progressPercentage > 0) {
+        progressBar.style.width = `${progress.progressPercentage}%`;
+        progressBar.classList.remove('progress-bar-animated');
+    } else {
+        progressBar.classList.add('progress-bar-animated');
+    }
+    
+    // Update status text based on progress status
+    let statusText = getProgressStatusText(progress);
+    statusDiv.textContent = statusText;
+    
+    // Update progress bar color based on status
+    updateProgressBarColor(progressBar, progress.status);
+}
+
+function updateBatchProgress(progress) {
+    const progressDiv = document.getElementById('batchProgress');
+    const progressBar = progressDiv?.querySelector('.progress-bar');
+    const statusDiv = document.getElementById('batchProgressStatus');
+    
+    if (!progressDiv || !progressBar || !statusDiv) return;
+    
+    // Show progress div if hidden
+    progressDiv.style.display = 'block';
+    
+    // Update progress bar
+    if (progress.progressPercentage > 0) {
+        progressBar.style.width = `${progress.progressPercentage}%`;
+        progressBar.classList.remove('progress-bar-animated');
+    } else {
+        progressBar.classList.add('progress-bar-animated');
+    }
+    
+    // Update status text based on progress status
+    let statusText = getProgressStatusText(progress);
+    statusDiv.textContent = statusText;
+    
+    // Update progress bar color based on status
+    updateProgressBarColor(progressBar, progress.status);
+}
+
+function getProgressStatusText(progress) {
+    const fileName = progress.fileName;
+    const currentFile = progress.currentFile;
+    const totalFiles = progress.totalFiles;
+    const currentPage = progress.currentPage;
+    const totalPages = progress.totalPages;
+    
+    // For batch operations, show file progress
+    if (totalFiles > 1) {
+        if (totalPages > 1) {
+            return `Processing ${fileName} (${currentFile}/${totalFiles}) - Page ${currentPage}/${totalPages}`;
+        } else {
+            return `Processing ${fileName} (${currentFile}/${totalFiles})`;
+        }
+    }
+    
+    // For single file operations
+    if (totalPages > 1) {
+        return `${progress.statusMessage} - Page ${currentPage}/${totalPages}`;
+    }
+    
+    return progress.statusMessage || 'Processing...';
+}
+
+function updateProgressBarColor(progressBar, status) {
+    // Remove all status classes
+    progressBar.classList.remove('bg-success', 'bg-danger', 'bg-warning');
+    
+    // Add appropriate class based on status
+    switch (status) {
+        case 'Completed':
+            progressBar.classList.add('bg-success');
+            break;
+        case 'Failed':
+            progressBar.classList.add('bg-danger');
+            break;
+        default:
+            // Keep default primary color for processing states
+            break;
+    }
+}
 }
