@@ -1,6 +1,6 @@
 using System;
 
-namespace AgentDMS.UI;
+namespace AgentDMS.Core.Models;
 
 /// <summary>
 /// Configuration options for the CLI application

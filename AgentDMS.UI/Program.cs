@@ -3,6 +3,7 @@ using System.IO;
 using System.Threading.Tasks;
 using AgentDMS.Core.Services;
 using AgentDMS.Core.Utilities;
+using AgentDMS.Core.Models;
 
 namespace AgentDMS.UI;
 

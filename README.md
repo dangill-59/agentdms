@@ -55,10 +55,19 @@ dotnet run --project AgentDMS.Web
 dotnet run --project AgentDMS.UI
 
 # Process a single file
-dotnet run --project AgentDMS.UI --process "path/to/image.jpg"
+dotnet run --project AgentDMS.UI -- --process "path/to/image.jpg"
+
+# Process directory with custom concurrency
+dotnet run --project AgentDMS.UI -- --directory "path/to/images" --max-concurrency 8
+
+# Benchmark library performance
+dotnet run --project AgentDMS.UI -- --benchmark "test.jpg"
 
 # Show help
-dotnet run --project AgentDMS.UI --help
+dotnet run --project AgentDMS.UI -- --help
+
+# Show supported formats
+dotnet run --project AgentDMS.UI -- --formats
 ```
 
 ### Interactive Menu Options
@@ -71,8 +80,10 @@ dotnet run --project AgentDMS.UI --help
 ### Programmatic Usage
 
 ```csharp
-// Initialize services
-var imageProcessor = new ImageProcessingService(maxConcurrency: 4);
+// Initialize services with custom concurrency
+var imageProcessor = new ImageProcessingService(
+    maxConcurrency: 8, 
+    outputDirectory: "custom/output");
 
 // Process a single file
 var result = await imageProcessor.ProcessImageAsync("image.jpg");
@@ -81,14 +92,26 @@ if (result.Success)
 {
     Console.WriteLine($"PNG: {result.ProcessedImage.ConvertedPngPath}");
     Console.WriteLine($"Thumbnail: {result.ProcessedImage.ThumbnailPath}");
+    
+    // Check metrics if available
+    if (result.Metrics != null)
+    {
+        Console.WriteLine($"Processing time: {result.Metrics.TotalProcessingTime?.TotalMilliseconds:F0}ms");
+    }
 }
 
-// Batch processing
+// Batch processing with progress tracking
+var progress = new Progress<int>(count => Console.WriteLine($"Processed: {count}"));
 var results = await imageProcessor.ProcessMultipleImagesAsync(filePaths, progress);
 
 // Generate thumbnail gallery
 var galleryPath = await ThumbnailGenerator.GenerateThumbnailGalleryAsync(
     imagePaths, outputDirectory, thumbnailSize: 200);
+
+// Benchmark library performance
+var benchmarkResults = await ImageLibraryBenchmark.BenchmarkSinglePageFormatsAsync(
+    "test.jpg", "benchmark_output");
+ImageLibraryBenchmark.PrintBenchmarkResults(benchmarkResults);
 ```
 
 ## Supported Formats
@@ -141,10 +164,40 @@ The test suite includes:
 
 ## Performance Features
 
-- **Async/Await**: Non-blocking operations throughout
-- **Concurrent Processing**: Parallel processing of multiple files
-- **Memory Efficient**: Proper disposal of image resources
-- **Progress Reporting**: Real-time feedback for long operations
+### Configurable Concurrency
+- **CLI Configuration**: Use `--max-concurrency` or `-c` to set concurrent processing tasks
+- **Environment Variable**: Set `AGENTDMS_MAX_CONCURRENCY` for system-wide configuration
+- **Intelligent Batching**: Large file sets are processed in batches to prevent resource exhaustion
+
+### File Size Management
+- **Configurable Limits**: Use `--max-file-size` or `-s` to set maximum file size in MB (default: 100MB)
+- **Environment Variable**: Set `AGENTDMS_MAX_FILE_SIZE_MB` for system-wide configuration
+- **Pre-filtering**: Large files are automatically skipped with informative messages
+
+### Performance Monitoring
+- **Detailed Metrics**: Track file load, decode, conversion, and thumbnail generation times
+- **Batch Analytics**: Aggregate metrics for batch processing with bottleneck identification
+- **Metrics Logging**: Enable/disable with `--no-metrics` flag
+
+### Library Benchmarking
+- **Performance Comparison**: Built-in benchmarking tool for ImageSharp vs Magick.NET
+- **Format-Specific Testing**: Benchmark single-page formats to determine optimal library
+- **Usage**: `dotnet run --project AgentDMS.UI -- --benchmark image.jpg`
+
+### Enhanced CLI Options
+```bash
+# Set concurrency and file size limits
+dotnet run --project AgentDMS.UI -- --directory "Images" --max-concurrency 8 --max-file-size 200
+
+# Use environment variables
+AGENTDMS_MAX_CONCURRENCY=16 dotnet run --project AgentDMS.UI -- --directory "Images"
+
+# Benchmark library performance
+dotnet run --project AgentDMS.UI -- --benchmark test.jpg --output "BenchmarkResults"
+
+# Process with custom settings and no metrics
+dotnet run --project AgentDMS.UI -- --process image.pdf --output "Output" --no-metrics
+```
 
 ## Error Handling
 
