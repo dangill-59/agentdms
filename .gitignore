@@ -7,6 +7,11 @@
 *.dll
 *.pdb
 
+# Database files (exclude design time databases)
+*_design.db
+*_design.db-shm
+*_design.db-wal
+
 # Visual Studio / VS Code
 .vs/
 .vscode/

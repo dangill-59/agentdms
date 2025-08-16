@@ -29,6 +29,54 @@ The solution consists of four main projects:
 - `ThumbnailGenerator`: Utility for creating thumbnails and galleries
 - `ImageFile` & `ProcessingResult`: Models for representing processed images and results
 
+## Database
+
+This application uses Entity Framework Core with SQLite for data persistence.
+
+### Database Setup
+
+The application automatically creates the database (`agentdms.db`) on first run. The database includes a `Documents` table with the following key columns:
+- `IsActive` - Whether the document is active (default: true)
+- `IsArchived` - Whether the document is archived (default: false)
+
+### Migration Commands
+
+To work with database migrations, use the following commands from the `AgentDMS.Core` project directory:
+
+```bash
+# Navigate to the Core project
+cd AgentDMS.Core
+
+# Create a new migration
+dotnet ef migrations add <MigrationName>
+
+# Apply migrations to the database
+dotnet ef database update
+
+# Revert to a specific migration
+dotnet ef database update <MigrationName>
+
+# Remove the last migration (if not applied to database)
+dotnet ef migrations remove
+
+# View migration status
+dotnet ef migrations list
+```
+
+### Database Configuration
+
+The database connection is configured in `appsettings.json`:
+
+```json
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Data Source=./agentdms.db"
+  }
+}
+```
+
+**Important:** All migrations and database operations target `agentdms.db` in the application root. Never use `agentdms_design.db` or similar design-time database files for production operations.
+
 ## Usage
 
 ### Web Interface (Recommended)

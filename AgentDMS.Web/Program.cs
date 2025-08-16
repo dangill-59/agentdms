@@ -1,5 +1,7 @@
 using AgentDMS.Core.Services;
 using AgentDMS.Web.Hubs;
+using AgentDMS.Core.Data;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -7,6 +9,10 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+// Add Entity Framework
+builder.Services.AddDbContext<AgentDmsDbContext>(options =>
+    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 // Add SignalR
 builder.Services.AddSignalR();
@@ -40,6 +46,15 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+// Ensure database is created and migrations are applied
+using (var scope = app.Services.CreateScope())
+{
+    var context = scope.ServiceProvider.GetRequiredService<AgentDmsDbContext>();
+    context.Database.EnsureCreated();
+    // Use Migrate() instead of EnsureCreated() in production to apply migrations
+    // context.Database.Migrate();
+}
 
 // Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
