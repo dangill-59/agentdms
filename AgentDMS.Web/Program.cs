@@ -1,5 +1,6 @@
 using AgentDMS.Core.Services;
 using AgentDMS.Web.Hubs;
+using AgentDMS.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,6 +18,9 @@ builder.Services.AddSingleton<IProgressBroadcaster, SignalRProgressBroadcaster>(
 builder.Services.AddSingleton<IBackgroundJobService, BackgroundJobService>();
 builder.Services.AddHostedService<BackgroundJobService>(provider => 
     (BackgroundJobService)provider.GetRequiredService<IBackgroundJobService>());
+
+// Add Mistral Configuration Service
+builder.Services.AddSingleton<IMistralConfigService, MistralConfigService>();
 
 // Add Mistral Document AI Service (optional - only if API key is configured)
 // Configuration example:
@@ -37,14 +41,26 @@ builder.Services.AddSingleton<MistralDocumentAiService>(provider =>
     var httpClientFactory = provider.GetRequiredService<IHttpClientFactory>();
     var httpClient = httpClientFactory.CreateClient(nameof(MistralDocumentAiService));
     var logger = provider.GetService<ILogger<MistralDocumentAiService>>();
+    var configService = provider.GetRequiredService<IMistralConfigService>();
     
-    // Get API key from environment variable or configuration
-    var apiKey = Environment.GetEnvironmentVariable("MISTRAL_API_KEY");
-    // Alternative: get from configuration
-    // var configuration = provider.GetRequiredService<IConfiguration>();
-    // var apiKey = configuration["MistralAI:ApiKey"];
+    // Get configuration from the config service
+    var config = configService.GetConfigAsync().Result;
     
-    return new MistralDocumentAiService(httpClient, apiKey, logger: logger);
+    // Fallback to environment variable if config is empty
+    var apiKey = !string.IsNullOrEmpty(config.ApiKey) ? config.ApiKey : Environment.GetEnvironmentVariable("MISTRAL_API_KEY");
+    var endpoint = !string.IsNullOrEmpty(config.Endpoint) ? config.Endpoint : "https://api.mistral.ai/v1/chat/completions";
+    
+    var service = new MistralDocumentAiService(httpClient, apiKey, endpoint, logger);
+    
+    // Subscribe to configuration changes to update the service at runtime
+    configService.ConfigChanged += (sender, newConfig) =>
+    {
+        // Note: Due to singleton pattern, we can't easily update the existing service
+        // This is a limitation of the current architecture
+        logger?.LogInformation("Mistral configuration changed. Restart the application to apply new settings.");
+    };
+    
+    return service;
 });
 
 // Update ImageProcessingService registration to include MistralDocumentAiService

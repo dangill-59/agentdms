@@ -528,3 +528,13 @@ header h1 i {
 .text-warning {
     color: #ffc107 !important;
 }
+
+/* Spinner animation for loading states */
+.spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
