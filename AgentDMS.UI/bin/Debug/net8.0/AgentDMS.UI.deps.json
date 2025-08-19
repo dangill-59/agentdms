@@ -135,17 +135,17 @@
           "runtimes/win-arm64/native/Magick.Native-Q16-arm64.dll": {
             "rid": "win-arm64",
             "assetType": "native",
-            "fileVersion": "7.1.2.0"
+            "fileVersion": "0.0.0.0"
           },
           "runtimes/win-x64/native/Magick.Native-Q16-x64.dll": {
             "rid": "win-x64",
             "assetType": "native",
-            "fileVersion": "7.1.2.0"
+            "fileVersion": "0.0.0.0"
           },
           "runtimes/win-x86/native/Magick.Native-Q16-x86.dll": {
             "rid": "win-x86",
             "assetType": "native",
-            "fileVersion": "7.1.2.0"
+            "fileVersion": "0.0.0.0"
           }
         }
       },
@@ -981,10 +981,7 @@
           "itext7": "9.2.0"
         },
         "runtime": {
-          "AgentDMS.Core.dll": {
-            "assemblyVersion": "1.0.0.0",
-            "fileVersion": "1.0.0.0"
-          }
+          "AgentDMS.Core.dll": {}
         }
       }
     }
