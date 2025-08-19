@@ -1,5 +1,6 @@
 using System;
 using System.Text.Json.Serialization;
+using AgentDMS.Core.Services;
 
 namespace AgentDMS.Core.Models;
 
@@ -15,6 +16,11 @@ public class ProcessingResult
     public TimeSpan ProcessingTime { get; set; }
     public TimeSpan? RenderingTime { get; set; }
     public ProcessingMetrics? Metrics { get; set; }
+    
+    /// <summary>
+    /// AI analysis result from document classification and data extraction
+    /// </summary>
+    public DocumentAiResult? AiAnalysis { get; set; }
     
     [JsonIgnore]
     public Exception? Error { get; set; }
@@ -58,4 +64,9 @@ public class ProcessingMetrics
     public TimeSpan? ConversionTime { get; set; }
     public TimeSpan? ThumbnailGenerationTime { get; set; }
     public TimeSpan? TotalProcessingTime { get; set; }
+    
+    /// <summary>
+    /// Time taken for AI document analysis
+    /// </summary>
+    public TimeSpan? AiAnalysisTime { get; set; }
 }
