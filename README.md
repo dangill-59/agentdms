@@ -47,6 +47,54 @@ dotnet run --project AgentDMS.Web
 - **Batch Processing**: Process multiple images from file paths
 - **Gallery Generation**: Create thumbnail galleries with customizable sizes
 - **Format Support**: View all supported formats with descriptions
+- **Mistral Settings**: Configure Mistral LLM integration for document AI
+
+### Mistral LLM Integration
+
+AgentDMS includes optional integration with Mistral LLM for document classification and data extraction. This feature enhances the image processing workflow with AI-powered document analysis.
+
+**Configuration via Web Interface:**
+
+1. Navigate to the **Mistral Settings** tab in the web interface
+2. Enter your Mistral API credentials and configuration:
+   - **API Key**: Your Mistral API key (stored locally)
+   - **Endpoint**: Mistral API endpoint (default: `https://api.mistral.ai/v1/chat/completions`)
+   - **Model**: Select from available models (mistral-small, mistral-medium, mistral-large, etc.)
+   - **Temperature**: Control randomness (0 = focused, 2 = creative)
+3. Click **Test Configuration** to validate your settings
+4. Click **Save Configuration** to store your settings
+
+**Available Models:**
+- `mistral-small`: Fast and efficient for basic tasks
+- `mistral-medium`: Balanced performance and capability  
+- `mistral-large`: Most capable model for complex analysis
+- `open-mistral-7b`: Open-source 7B parameter model
+- `open-mixtral-8x7b`: Open-source mixture of experts model
+- `open-mixtral-8x22b`: Large open-source mixture of experts model
+
+**Features:**
+- **Document Classification**: Automatic document type detection (invoice, contract, receipt, etc.)
+- **Data Extraction**: Key-value pair extraction from document text
+- **Confidence Scoring**: AI prediction confidence levels
+- **Runtime Configuration**: Update settings without restarting the application
+- **Secure Storage**: API keys stored locally in encrypted configuration files
+
+**Configuration File:**
+Settings are stored in `AgentDMS.Web/App_Data/mistralconfig.json`:
+```json
+{
+  "apiKey": "your-api-key-here",
+  "endpoint": "https://api.mistral.ai/v1/chat/completions",
+  "model": "mistral-small",
+  "temperature": 0.1
+}
+```
+
+**Environment Variables (Alternative):**
+```bash
+# Set via environment variable (fallback option)
+export MISTRAL_API_KEY="your-api-key-here"
+```
 
 ### Command Line Interface
 

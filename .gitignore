@@ -36,3 +36,7 @@ Thumbs.db
 # Temporary output directories
 AgentDMS_Output/
 AgentDMS_Gallery/
+
+# Configuration files with sensitive data (optional)
+# Uncomment the line below if you don't want to commit config files
+# **/App_Data/mistralconfig.json
