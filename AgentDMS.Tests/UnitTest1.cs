@@ -345,4 +345,80 @@ public class ImageProcessingServiceTests
                 File.Delete(testImagePath);
         }
     }
+
+    [Fact]
+    public async Task MistralDocumentAiService_WithoutApiKey_ShouldHandleGracefully()
+    {
+        // Arrange
+        using var httpClient = new System.Net.Http.HttpClient();
+        var mistralService = new MistralDocumentAiService(httpClient, apiKey: null);
+
+        // Act
+        var result = await mistralService.AnalyzeDocumentAsync("Test document text");
+
+        // Assert
+        Assert.False(result.Success);
+        Assert.Contains("API key not configured", result.Message);
+    }
+
+    [Fact]
+    public void ImageProcessingService_WithMistralService_ShouldInitializeSuccessfully()
+    {
+        // Arrange & Act
+        using var httpClient = new System.Net.Http.HttpClient();
+        var mistralService = new MistralDocumentAiService(httpClient, apiKey: null);
+        var imageProcessor = new ImageProcessingService(
+            maxConcurrency: 1,
+            outputDirectory: _testOutputDir,
+            logger: null,
+            mistralService: mistralService
+        );
+
+        // Assert
+        Assert.NotNull(imageProcessor);
+        
+        // Verify supported extensions are still available
+        var extensions = ImageProcessingService.GetSupportedExtensions();
+        Assert.Contains(".pdf", extensions);
+        Assert.Contains(".png", extensions);
+        Assert.Contains(".jpg", extensions);
+    }
+
+    [Fact]
+    public async Task ProcessImageAsync_WithMistralService_ShouldIncludeAiAnalysisPlaceholder()
+    {
+        // Arrange
+        using var httpClient = new System.Net.Http.HttpClient();
+        var mistralService = new MistralDocumentAiService(httpClient, apiKey: null);
+        var imageProcessor = new ImageProcessingService(
+            maxConcurrency: 1,
+            outputDirectory: _testOutputDir,
+            logger: null,
+            mistralService: mistralService
+        );
+
+        var testImagePath = CreateTestImage("test_mistral_integration.png");
+
+        try
+        {
+            // Act
+            var result = await imageProcessor.ProcessImageAsync(testImagePath);
+
+            // Assert
+            Assert.True(result.Success, $"Processing should succeed: {result.Message}");
+            
+            // AI analysis should not be present because API key is not configured
+            // but the processing should still complete successfully
+            Assert.Null(result.AiAnalysis);
+            
+            // Verify processing metrics are present
+            Assert.NotNull(result.Metrics);
+        }
+        finally
+        {
+            // Cleanup
+            if (File.Exists(testImagePath))
+                File.Delete(testImagePath);
+        }
+    }
 }
