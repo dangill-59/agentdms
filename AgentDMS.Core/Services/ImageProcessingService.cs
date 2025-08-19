@@ -20,12 +20,18 @@ public class ImageProcessingService
     private readonly SemaphoreSlim _semaphore;
     private readonly string _outputDirectory;
     private readonly ILogger<ImageProcessingService>? _logger;
+    private readonly MistralDocumentAiService? _mistralService;
 
-    public ImageProcessingService(int maxConcurrency = 4, string? outputDirectory = null, ILogger<ImageProcessingService>? logger = null)
+    public ImageProcessingService(
+        int maxConcurrency = 4, 
+        string? outputDirectory = null, 
+        ILogger<ImageProcessingService>? logger = null,
+        MistralDocumentAiService? mistralService = null)
     {
         _semaphore = new SemaphoreSlim(maxConcurrency);
         _outputDirectory = outputDirectory ?? Path.Combine(Path.GetTempPath(), "AgentDMS_Output");
         _logger = logger;
+        _mistralService = mistralService;
         
         // Ensure output directory exists
         Directory.CreateDirectory(_outputDirectory);
@@ -112,6 +118,12 @@ public class ImageProcessingService
                 result.ProcessingTime = totalTime;
                 metrics.TotalProcessingTime = totalTime;
                 result.Metrics = metrics;
+                
+                // Perform AI analysis if Mistral service is available
+                if (_mistralService != null)
+                {
+                    await PerformAiAnalysisAsync(result, progressReporter, cancellationToken);
+                }
                 
                 if (progressReporter != null)
                     await progressReporter.ReportProgress(fileName, ProgressStatus.Completed, "Processing completed successfully");
@@ -430,6 +442,117 @@ public class ImageProcessingService
                 await progressReporter.ReportProgress(imageFile.FileName, ProgressStatus.Failed, "Failed to process PDF", 1, 1, 1, 1, ex.Message);
             return ProcessingResult.Failed($"Error processing PDF: {ex.Message}", ex);
         }
+    }
+
+    /// <summary>
+    /// Performs AI analysis on processed document using Mistral LLM API
+    /// </summary>
+    /// <param name="processingResult">The processing result to analyze</param>
+    /// <param name="progressReporter">Progress reporter for updates</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    private async Task PerformAiAnalysisAsync(ProcessingResult processingResult, DetailedProgressReporter? progressReporter, CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (_mistralService == null || processingResult.ProcessedImage == null)
+                return;
+
+            var fileName = processingResult.ProcessedImage.FileName;
+            if (progressReporter != null)
+                await progressReporter.ReportProgress(fileName, ProgressStatus.ProcessingFile, "Performing AI document analysis...");
+
+            // Extract text from document
+            // TODO: Implement OCR text extraction from processed images
+            // This is a placeholder - in a real implementation, you would:
+            // 1. Use an OCR library like Tesseract to extract text from the converted PNG files
+            // 2. For PDFs, you might also extract text directly using a PDF library
+            // 3. Combine extracted text from all pages for multi-page documents
+            
+            var extractedText = await ExtractTextFromDocumentAsync(processingResult, cancellationToken);
+            
+            if (string.IsNullOrWhiteSpace(extractedText))
+            {
+                _logger?.LogInformation("No text extracted from document {FileName}, skipping AI analysis", fileName);
+                return;
+            }
+
+            _logger?.LogInformation("Extracted {TextLength} characters of text from {FileName}, starting AI analysis", 
+                extractedText.Length, fileName);
+
+            var aiStart = DateTime.UtcNow;
+            var aiResult = await _mistralService.AnalyzeDocumentAsync(extractedText, cancellationToken);
+            var aiProcessingTime = DateTime.UtcNow - aiStart;
+
+            if (aiResult.Success)
+            {
+                processingResult.AiAnalysis = aiResult;
+                if (processingResult.Metrics != null)
+                {
+                    processingResult.Metrics.AiAnalysisTime = aiProcessingTime;
+                }
+
+                _logger?.LogInformation("AI analysis completed for {FileName}. Document type: {DocumentType}, Confidence: {Confidence:F2}", 
+                    fileName, aiResult.DocumentType, aiResult.Confidence);
+
+                if (progressReporter != null)
+                    await progressReporter.ReportProgress(fileName, ProgressStatus.ProcessingFile, 
+                        $"AI analysis completed - Document type: {aiResult.DocumentType}");
+            }
+            else
+            {
+                _logger?.LogWarning("AI analysis failed for {FileName}: {Message}", fileName, aiResult.Message);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error during AI analysis for document");
+            // Don't fail the entire processing pipeline if AI analysis fails
+        }
+    }
+
+    /// <summary>
+    /// Extracts text from processed document for AI analysis
+    /// </summary>
+    /// <param name="processingResult">The processing result containing processed images</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Extracted text content</returns>
+    private async Task<string> ExtractTextFromDocumentAsync(ProcessingResult processingResult, CancellationToken cancellationToken)
+    {
+        // TODO: Implement OCR text extraction
+        // This is a placeholder implementation. In a production system, you would:
+        // 
+        // 1. Use an OCR library like Tesseract.NET:
+        //    using var engine = new TesseractEngine(@"./tessdata", "eng", EngineMode.Default);
+        //    using var img = Pix.LoadFromFile(imagePath);
+        //    using var page = engine.Process(img);
+        //    return page.GetText();
+        //
+        // 2. For PDFs, extract text directly using iTextSharp or PdfPig:
+        //    using var reader = new PdfReader(pdfPath);
+        //    var text = new StringBuilder();
+        //    for (int page = 1; page <= reader.NumberOfPages; page++)
+        //    {
+        //        text.Append(PdfTextExtractor.GetTextFromPage(reader, page));
+        //    }
+        //    return text.ToString();
+        //
+        // 3. Combine text from multiple pages for multi-page documents
+        // 4. Clean and normalize the extracted text
+        
+        // For now, return a placeholder that indicates text extraction is needed
+        await Task.Delay(1, cancellationToken); // Simulate async operation
+        
+        if (processingResult.ProcessedImage != null)
+        {
+            // Return a sample text for testing purposes
+            // In production, this would be replaced with actual OCR
+            var extension = processingResult.ProcessedImage.OriginalFormat?.ToLowerInvariant();
+            return $"[OCR_PLACEHOLDER] Document type: {extension}, File: {processingResult.ProcessedImage.FileName}. " +
+                   $"This is placeholder text that would be replaced with actual OCR extraction. " +
+                   $"Document appears to be a {extension} file with {processingResult.ProcessedImage.PageCount} page(s).";
+        }
+        
+        return string.Empty;
     }
 
     /// <summary>

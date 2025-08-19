@@ -12,12 +12,53 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddSignalR();
 
 // Add AgentDMS Core services
-builder.Services.AddSingleton<ImageProcessingService>();
 builder.Services.AddSingleton<FileUploadService>();
 builder.Services.AddSingleton<IProgressBroadcaster, SignalRProgressBroadcaster>();
 builder.Services.AddSingleton<IBackgroundJobService, BackgroundJobService>();
 builder.Services.AddHostedService<BackgroundJobService>(provider => 
     (BackgroundJobService)provider.GetRequiredService<IBackgroundJobService>());
+
+// Add Mistral Document AI Service (optional - only if API key is configured)
+// Configuration example:
+// Set environment variable: MISTRAL_API_KEY=your_api_key_here
+// Or configure in appsettings.json and inject via IOptions<T>
+/*
+Example appsettings.json configuration:
+{
+  "MistralAI": {
+    "ApiKey": "your_api_key_here", 
+    "Endpoint": "https://api.mistral.ai/v1/chat/completions"
+  }
+}
+*/
+builder.Services.AddHttpClient<MistralDocumentAiService>();
+builder.Services.AddSingleton<MistralDocumentAiService>(provider =>
+{
+    var httpClientFactory = provider.GetRequiredService<IHttpClientFactory>();
+    var httpClient = httpClientFactory.CreateClient(nameof(MistralDocumentAiService));
+    var logger = provider.GetService<ILogger<MistralDocumentAiService>>();
+    
+    // Get API key from environment variable or configuration
+    var apiKey = Environment.GetEnvironmentVariable("MISTRAL_API_KEY");
+    // Alternative: get from configuration
+    // var configuration = provider.GetRequiredService<IConfiguration>();
+    // var apiKey = configuration["MistralAI:ApiKey"];
+    
+    return new MistralDocumentAiService(httpClient, apiKey, logger: logger);
+});
+
+// Update ImageProcessingService registration to include MistralDocumentAiService
+builder.Services.AddSingleton<ImageProcessingService>(provider =>
+{
+    var logger = provider.GetService<ILogger<ImageProcessingService>>();
+    var mistralService = provider.GetService<MistralDocumentAiService>();
+    
+    return new ImageProcessingService(
+        maxConcurrency: 4, 
+        outputDirectory: null, 
+        logger: logger, 
+        mistralService: mistralService);
+});
 
 // Configure CORS to allow all origins for development (updated for SignalR)
 builder.Services.AddCors(options =>
