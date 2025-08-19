@@ -1,0 +1,6 @@
+{
+  "apiKey": "",
+  "endpoint": "https://api.mistral.ai/v1/chat/completions",
+  "model": "mistral-small",
+  "temperature": 0.1
+}

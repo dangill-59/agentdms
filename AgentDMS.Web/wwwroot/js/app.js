@@ -13,6 +13,9 @@ async function init() {
     // Load supported formats
     loadSupportedFormats();
     
+    // Load Mistral configuration
+    loadMistralConfig();
+    
     // Bind event handlers
     bindEventHandlers();
     
@@ -62,6 +65,11 @@ function bindEventHandlers() {
     
     // Gallery form
     document.getElementById('galleryForm').addEventListener('submit', handleGalleryGeneration);
+    
+    // Mistral configuration form
+    document.getElementById('mistralConfigForm').addEventListener('submit', saveMistralConfig);
+    document.getElementById('testConfigBtn').addEventListener('click', testMistralConfig);
+    document.getElementById('mistralTemperature').addEventListener('input', updateTemperatureDisplay);
 }
 
 // Initialize image zoom controls
@@ -1036,4 +1044,141 @@ function updateProgressBarColor(progressBar, status) {
             // Keep default primary color for processing states
             break;
     }
+}
+
+// Mistral Configuration Functions
+async function loadMistralConfig() {
+    try {
+        const response = await apiCall('/api/mistralconfig');
+        if (response.ok) {
+            const config = await response.json();
+            populateMistralForm(config);
+        } else {
+            showMistralStatus('Failed to load configuration', 'error');
+        }
+    } catch (error) {
+        console.error('Error loading Mistral config:', error);
+        showMistralStatus('Error loading configuration', 'error');
+    }
+}
+
+function populateMistralForm(config) {
+    document.getElementById('mistralApiKey').value = config.apiKey || '';
+    document.getElementById('mistralEndpoint').value = config.endpoint || 'https://api.mistral.ai/v1/chat/completions';
+    document.getElementById('mistralModel').value = config.model || 'mistral-small';
+    document.getElementById('mistralTemperature').value = config.temperature || 0.1;
+    document.getElementById('temperatureValue').textContent = config.temperature || 0.1;
+}
+
+async function saveMistralConfig(event) {
+    event.preventDefault();
+    
+    const form = document.getElementById('mistralConfigForm');
+    const formData = new FormData(form);
+    
+    const config = {
+        apiKey: formData.get('apiKey'),
+        endpoint: formData.get('endpoint'),
+        model: formData.get('model'),
+        temperature: parseFloat(formData.get('temperature'))
+    };
+    
+    try {
+        const response = await apiCall('/api/mistralconfig', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(config)
+        });
+        
+        if (response.ok) {
+            showMistralStatus('Configuration saved successfully!', 'success');
+        } else {
+            const error = await response.json();
+            showMistralStatus(`Failed to save configuration: ${error.message || response.statusText}`, 'error');
+        }
+    } catch (error) {
+        console.error('Error saving Mistral config:', error);
+        showMistralStatus('Error saving configuration', 'error');
+    }
+}
+
+async function testMistralConfig() {
+    const form = document.getElementById('mistralConfigForm');
+    const formData = new FormData(form);
+    
+    const config = {
+        apiKey: formData.get('apiKey'),
+        endpoint: formData.get('endpoint'),
+        model: formData.get('model'),
+        temperature: parseFloat(formData.get('temperature'))
+    };
+    
+    if (!config.apiKey) {
+        showMistralStatus('API Key is required for testing', 'error');
+        return;
+    }
+    
+    const testBtn = document.getElementById('testConfigBtn');
+    const originalText = testBtn.innerHTML;
+    testBtn.innerHTML = '<i class="bi bi-arrow-clockwise spin"></i> Testing...';
+    testBtn.disabled = true;
+    
+    try {
+        const response = await apiCall('/api/mistralconfig/test', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(config)
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+            showMistralStatus('Configuration test successful!', 'success');
+        } else {
+            showMistralStatus(`Configuration test failed: ${result.message || result.details || 'Unknown error'}`, 'error');
+        }
+    } catch (error) {
+        console.error('Error testing Mistral config:', error);
+        showMistralStatus('Error testing configuration', 'error');
+    } finally {
+        testBtn.innerHTML = originalText;
+        testBtn.disabled = false;
+    }
+}
+
+function showMistralStatus(message, type) {
+    const statusDiv = document.getElementById('mistralStatus');
+    const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
+    const icon = type === 'success' ? 'bi-check-circle' : 'bi-exclamation-triangle';
+    
+    statusDiv.innerHTML = `
+        <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+            <i class="bi ${icon}"></i> ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    statusDiv.style.display = 'block';
+    
+    // Auto-hide success messages after 3 seconds
+    if (type === 'success') {
+        setTimeout(() => {
+            const alert = statusDiv.querySelector('.alert');
+            if (alert) {
+                alert.classList.remove('show');
+                setTimeout(() => {
+                    statusDiv.style.display = 'none';
+                }, 150);
+            }
+        }, 3000);
+    }
+}
+
+function updateTemperatureDisplay() {
+    const temperatureSlider = document.getElementById('mistralTemperature');
+    const temperatureValue = document.getElementById('temperatureValue');
+    temperatureValue.textContent = temperatureSlider.value;
 }
