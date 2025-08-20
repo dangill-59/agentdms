@@ -134,6 +134,36 @@ public class ScannerServiceTests
         // Should always have at least mock scanners
         Assert.NotEmpty(scanners);
     }
+
+    [Fact]
+    public async Task GetDiagnosticInfoAsync_ShouldReturnDiagnosticInformation()
+    {
+        // Arrange
+        using var scannerService = new ScannerService();
+
+        // Act
+        var diagnostics = await scannerService.GetDiagnosticInfoAsync();
+
+        // Assert
+        Assert.NotNull(diagnostics);
+        Assert.True(diagnostics.ContainsKey("Platform"));
+        Assert.True(diagnostics.ContainsKey("IsWindows"));
+        Assert.True(diagnostics.ContainsKey("RealScannerSupport"));
+        Assert.True(diagnostics.ContainsKey("Timestamp"));
+        
+        if (OperatingSystem.IsWindows())
+        {
+            // On Windows, should have additional diagnostic information
+            Assert.True(diagnostics.ContainsKey("TwainDirectories"));
+            Assert.True(diagnostics.ContainsKey("RegistryKeys"));
+            Assert.True(diagnostics.ContainsKey("TwainSession"));
+        }
+        else
+        {
+            // On non-Windows, should have a message explaining limitation
+            Assert.True(diagnostics.ContainsKey("Message"));
+        }
+    }
 }
 
 /// <summary>

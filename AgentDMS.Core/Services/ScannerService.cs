@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.IO;
+using System.Linq;
 using Microsoft.Extensions.Logging;
 using AgentDMS.Core.Models;
 using SixLabors.ImageSharp;
@@ -258,6 +259,131 @@ public class ScannerService : IScannerService, IDisposable
 
         await Task.CompletedTask;
         return capabilities;
+    }
+
+    /// <summary>
+    /// Get diagnostic information about TWAIN scanner detection for troubleshooting
+    /// </summary>
+    public async Task<Dictionary<string, object>> GetDiagnosticInfoAsync()
+    {
+        var diagnostics = new Dictionary<string, object>
+        {
+            ["Platform"] = Environment.OSVersion.ToString(),
+            ["IsWindows"] = OperatingSystem.IsWindows(),
+            ["RealScannerSupport"] = _isRealScanner,
+            ["Timestamp"] = DateTime.UtcNow
+        };
+
+        if (!OperatingSystem.IsWindows())
+        {
+            diagnostics["Message"] = "TWAIN scanner detection is only supported on Windows";
+            return diagnostics;
+        }
+
+        await Task.Run(() =>
+        {
+            // Check TWAIN directories
+            var twainDirectories = new[]
+            {
+                @"C:\Windows\twain_32",
+                @"C:\Windows\twain_64", 
+                @"C:\TWAIN_32",
+                @"C:\TWAIN_64"
+            };
+
+            var directoryInfo = new List<object>();
+            foreach (var dir in twainDirectories)
+            {
+                var exists = IODirectory.Exists(dir);
+                var dsFiles = exists ? IODirectory.GetFiles(dir, "*.ds", SearchOption.AllDirectories) : new string[0];
+                
+                directoryInfo.Add(new
+                {
+                    Directory = dir,
+                    Exists = exists,
+                    DsFileCount = dsFiles.Length,
+                    DsFiles = dsFiles.Take(10).ToArray() // Limit to first 10 for readability
+                });
+            }
+            diagnostics["TwainDirectories"] = directoryInfo;
+
+            // Check registry keys
+            var registryPaths = new[]
+            {
+                @"SOFTWARE\TWAIN_32\",
+                @"SOFTWARE\WOW6432Node\TWAIN_32\",
+                @"SOFTWARE\TWAIN\",
+                @"SOFTWARE\WOW6432Node\TWAIN\"
+            };
+
+            var registryInfo = new List<object>();
+            foreach (var path in registryPaths)
+            {
+                try
+                {
+                    using var key = Registry.LocalMachine.OpenSubKey(path);
+                    var exists = key != null;
+                    var subKeys = exists ? key.GetSubKeyNames() : new string[0];
+                    
+                    registryInfo.Add(new
+                    {
+                        RegistryPath = $"HKLM\\{path}",
+                        Exists = exists,
+                        SubKeyCount = subKeys.Length,
+                        SubKeys = subKeys.Take(10).ToArray() // Limit to first 10 for readability
+                    });
+                }
+                catch (Exception ex)
+                {
+                    registryInfo.Add(new
+                    {
+                        RegistryPath = $"HKLM\\{path}",
+                        Exists = false,
+                        Error = ex.Message
+                    });
+                }
+            }
+            diagnostics["RegistryKeys"] = registryInfo;
+
+            // Try TWAIN session
+            try
+            {
+                var session = new TwainSession(TWIdentity.CreateFromAssembly(DataGroups.Image, typeof(ScannerService).Assembly));
+                try
+                {
+                    session.Open();
+                    var sources = session.GetSources().ToArray();
+                    
+                    diagnostics["TwainSession"] = new
+                    {
+                        Success = true,
+                        SourceCount = sources.Length,
+                        Sources = sources.Select(s => new 
+                        { 
+                            Name = s.Name, 
+                            Manufacturer = s.Manufacturer, 
+                            ProductFamily = s.ProductFamily,
+                            Version = s.Version.Info 
+                        }).ToArray()
+                    };
+                }
+                finally
+                {
+                    session.Close();
+                }
+            }
+            catch (Exception ex)
+            {
+                diagnostics["TwainSession"] = new
+                {
+                    Success = false,
+                    Error = ex.Message,
+                    ErrorType = ex.GetType().Name
+                };
+            }
+        });
+
+        return diagnostics;
     }
 
     /// <summary>

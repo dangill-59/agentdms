@@ -29,6 +29,11 @@ public interface IScannerService
     /// Get platform-specific scanning capabilities
     /// </summary>
     Task<ScannerCapabilities> GetCapabilitiesAsync();
+    
+    /// <summary>
+    /// Get diagnostic information about TWAIN scanner detection for troubleshooting
+    /// </summary>
+    Task<Dictionary<string, object>> GetDiagnosticInfoAsync();
 }
 
 /// <summary>
