@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using System.IO;
 using Microsoft.Extensions.Logging;
 using AgentDMS.Core.Models;
 using SixLabors.ImageSharp;
@@ -11,8 +12,10 @@ using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.Fonts;
 using IOPath = System.IO.Path;
 using IODirectory = System.IO.Directory;
+using IOFile = System.IO.File;
 using NTwain;
 using NTwain.Data;
+using Microsoft.Win32;
 
 namespace AgentDMS.Core.Services;
 
@@ -88,15 +91,21 @@ public class ScannerService : IScannerService, IDisposable
         {
             await Task.Run(() =>
             {
+                _logger?.LogInformation("Initializing TWAIN session...");
+                
                 // Initialize TWAIN session
                 var session = new TwainSession(TWIdentity.CreateFromAssembly(DataGroups.Image, typeof(ScannerService).Assembly));
                 
                 try
                 {
                     session.Open();
+                    _logger?.LogInformation("TWAIN session opened successfully");
                     
                     // Get list of available TWAIN data sources (scanners)
-                    foreach (var source in session.GetSources())
+                    var sources = session.GetSources();
+                    _logger?.LogInformation("Found {Count} TWAIN sources from session.GetSources()", sources.Count());
+                    
+                    foreach (var source in sources)
                     {
                         var scannerInfo = new ScannerInfo
                         {
@@ -115,19 +124,50 @@ public class ScannerService : IScannerService, IDisposable
                         };
                         
                         scanners.Add(scannerInfo);
-                        _logger?.LogInformation("Found TWAIN scanner: {Name} by {Manufacturer}", 
-                            scannerInfo.Name, scannerInfo.Manufacturer);
+                        _logger?.LogInformation("Found TWAIN scanner: {Name} by {Manufacturer} (Version: {Version})", 
+                            scannerInfo.Name, scannerInfo.Manufacturer, source.Version.Info);
                     }
                 }
                 finally
                 {
                     session.Close();
+                    _logger?.LogInformation("TWAIN session closed");
                 }
             });
+            
+            // If no scanners found through standard TWAIN API, try fallback methods
+            if (scanners.Count == 0)
+            {
+                _logger?.LogInformation("No scanners found via standard TWAIN API, trying fallback detection methods...");
+                
+                // Try to find scanners by scanning TWAIN directories
+                var directoryScanners = await GetTwainScannersFromDirectoriesAsync();
+                scanners.AddRange(directoryScanners);
+                
+                // Try to find scanners from Windows registry
+                var registryScanners = await GetTwainScannersFromRegistryAsync();
+                scanners.AddRange(registryScanners);
+            }
         }
         catch (Exception ex)
         {
             _logger?.LogWarning(ex, "Failed to enumerate TWAIN scanners. This is normal if no TWAIN drivers are installed.");
+            
+            // Even if TWAIN API fails, try fallback methods
+            try
+            {
+                _logger?.LogInformation("TWAIN API failed, trying fallback detection methods...");
+                
+                var directoryScanners = await GetTwainScannersFromDirectoriesAsync();
+                scanners.AddRange(directoryScanners);
+                
+                var registryScanners = await GetTwainScannersFromRegistryAsync();
+                scanners.AddRange(registryScanners);
+            }
+            catch (Exception fallbackEx)
+            {
+                _logger?.LogWarning(fallbackEx, "Fallback scanner detection methods also failed");
+            }
         }
         
         return scanners;
@@ -367,6 +407,184 @@ public class ScannerService : IScannerService, IDisposable
             ScanFormat.Png => ".png",
             _ => ".png"
         };
+    }
+
+    /// <summary>
+    /// Fallback method to find TWAIN scanners by scanning standard TWAIN directories
+    /// </summary>
+    private async Task<List<ScannerInfo>> GetTwainScannersFromDirectoriesAsync()
+    {
+        var scanners = new List<ScannerInfo>();
+        
+        if (!OperatingSystem.IsWindows())
+        {
+            return scanners;
+        }
+        
+        await Task.Run(() =>
+        {
+            // Standard TWAIN directories on Windows
+            var twainDirectories = new[]
+            {
+                @"C:\Windows\twain_32",
+                @"C:\Windows\twain_64", 
+                @"C:\TWAIN_32",
+                @"C:\TWAIN_64"
+            };
+            
+            _logger?.LogInformation("Scanning TWAIN directories for .ds files...");
+            
+            foreach (var baseDir in twainDirectories)
+            {
+                if (!IODirectory.Exists(baseDir))
+                {
+                    _logger?.LogDebug("TWAIN directory does not exist: {Directory}", baseDir);
+                    continue;
+                }
+                
+                _logger?.LogInformation("Scanning TWAIN directory: {Directory}", baseDir);
+                
+                try
+                {
+                    // Recursively search for .ds files
+                    var dsFiles = IODirectory.GetFiles(baseDir, "*.ds", SearchOption.AllDirectories);
+                    _logger?.LogInformation("Found {Count} .ds files in {Directory}", dsFiles.Length, baseDir);
+                    
+                    foreach (var dsFile in dsFiles)
+                    {
+                        try
+                        {
+                            var fileName = IOPath.GetFileNameWithoutExtension(dsFile);
+                            var directory = IOPath.GetDirectoryName(dsFile);
+                            var relativePath = IOPath.GetRelativePath(baseDir, dsFile);
+                            
+                            var scannerInfo = new ScannerInfo
+                            {
+                                DeviceId = $"directory_{fileName}_{directory?.GetHashCode():X8}",
+                                Name = fileName,
+                                Manufacturer = "Unknown",
+                                Model = "TWAIN Scanner (Directory Scan)",
+                                IsAvailable = true,
+                                IsDefault = false,
+                                Capabilities = new Dictionary<string, object>
+                                {
+                                    ["Type"] = "TWAIN_Directory",
+                                    ["FilePath"] = dsFile,
+                                    ["RelativePath"] = relativePath,
+                                    ["DetectionMethod"] = "Directory Scan"
+                                }
+                            };
+                            
+                            scanners.Add(scannerInfo);
+                            _logger?.LogInformation("Found TWAIN scanner via directory scan: {Name} at {Path}", 
+                                fileName, dsFile);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger?.LogWarning(ex, "Error processing .ds file: {File}", dsFile);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "Error scanning TWAIN directory: {Directory}", baseDir);
+                }
+            }
+        });
+        
+        return scanners;
+    }
+
+    /// <summary>
+    /// Fallback method to find TWAIN scanners from Windows registry
+    /// </summary>
+    private async Task<List<ScannerInfo>> GetTwainScannersFromRegistryAsync()
+    {
+        var scanners = new List<ScannerInfo>();
+        
+        if (!OperatingSystem.IsWindows())
+        {
+            return scanners;
+        }
+        
+        await Task.Run(() =>
+        {
+            _logger?.LogInformation("Scanning Windows registry for TWAIN data sources...");
+            
+            // Registry paths where TWAIN data sources are typically registered
+            var registryPaths = new[]
+            {
+                @"SOFTWARE\TWAIN_32\",
+                @"SOFTWARE\WOW6432Node\TWAIN_32\",
+                @"SOFTWARE\TWAIN\",
+                @"SOFTWARE\WOW6432Node\TWAIN\"
+            };
+            
+            foreach (var basePath in registryPaths)
+            {
+                try
+                {
+                    using var key = Registry.LocalMachine.OpenSubKey(basePath);
+                    if (key == null)
+                    {
+                        _logger?.LogDebug("Registry key does not exist: HKLM\\{Path}", basePath);
+                        continue;
+                    }
+                    
+                    _logger?.LogInformation("Scanning registry path: HKLM\\{Path}", basePath);
+                    
+                    var subKeyNames = key.GetSubKeyNames();
+                    _logger?.LogInformation("Found {Count} subkeys in {Path}", subKeyNames.Length, basePath);
+                    
+                    foreach (var subKeyName in subKeyNames)
+                    {
+                        try
+                        {
+                            using var subKey = key.OpenSubKey(subKeyName);
+                            if (subKey == null) continue;
+                            
+                            // Look for common TWAIN registry values
+                            var description = subKey.GetValue("Description")?.ToString();
+                            var manufacturer = subKey.GetValue("Manufacturer")?.ToString();
+                            var version = subKey.GetValue("Version")?.ToString();
+                            var fileName = subKey.GetValue("Filename")?.ToString();
+                            
+                            var scannerInfo = new ScannerInfo
+                            {
+                                DeviceId = $"registry_{subKeyName}_{basePath.GetHashCode():X8}",
+                                Name = description ?? subKeyName,
+                                Manufacturer = manufacturer ?? "Unknown",
+                                Model = "TWAIN Scanner (Registry)",
+                                IsAvailable = true,
+                                IsDefault = false,
+                                Capabilities = new Dictionary<string, object>
+                                {
+                                    ["Type"] = "TWAIN_Registry",
+                                    ["RegistryPath"] = $"{basePath}{subKeyName}",
+                                    ["Version"] = version ?? "Unknown",
+                                    ["Filename"] = fileName ?? "Unknown",
+                                    ["DetectionMethod"] = "Registry Scan"
+                                }
+                            };
+                            
+                            scanners.Add(scannerInfo);
+                            _logger?.LogInformation("Found TWAIN scanner via registry: {Name} by {Manufacturer} at HKLM\\{Path}{SubKey}", 
+                                scannerInfo.Name, scannerInfo.Manufacturer, basePath, subKeyName);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger?.LogWarning(ex, "Error reading registry subkey: {SubKey}", subKeyName);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "Error scanning registry path: HKLM\\{Path}", basePath);
+                }
+            }
+        });
+        
+        return scanners;
     }
 
     public void Dispose()
