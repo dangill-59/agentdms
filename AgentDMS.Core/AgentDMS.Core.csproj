@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <PackageReference Include="itext7" Version="9.2.0" />
+    <PackageReference Include="NTwain" Version="3.7.2" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.11" />
     <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.1.7" />
     <PackageReference Include="Magick.NET-Q16-AnyCPU" Version="14.7.0" />
