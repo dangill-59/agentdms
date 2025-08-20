@@ -1052,7 +1052,7 @@ function updateProgressBarColor(progressBar, status) {
 // Mistral Configuration Functions
 async function loadMistralConfig() {
     try {
-        const response = await apiCall('/api/mistralconfig');
+        const response = await apiCall('mistralconfig');
         if (response.ok) {
             const config = await response.json();
             populateMistralForm(config);
@@ -1087,7 +1087,7 @@ async function saveMistralConfig(event) {
     };
     
     try {
-        const response = await apiCall('/api/mistralconfig', {
+        const response = await apiCall('mistralconfig', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -1129,7 +1129,7 @@ async function testMistralConfig() {
     testBtn.disabled = true;
     
     try {
-        const response = await apiCall('/api/mistralconfig/test', {
+        const response = await apiCall('mistralconfig/test', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -1210,7 +1210,7 @@ async function initializeScannerInterface() {
 
 async function loadAvailableScanners() {
     try {
-        const response = await apiCall('/api/ImageProcessing/scanners');
+        const response = await apiCall('ImageProcessing/scanners');
         availableScanners = response || [];
         
         const scannerSelect = document.getElementById('scannerSelect');
@@ -1243,7 +1243,7 @@ async function loadAvailableScanners() {
 
 async function loadScannerCapabilities() {
     try {
-        const response = await apiCall('/api/ImageProcessing/scanners/capabilities');
+        const response = await apiCall('ImageProcessing/scanners/capabilities');
         scannerCapabilities = response;
         updatePlatformCapabilities();
     } catch (error) {
