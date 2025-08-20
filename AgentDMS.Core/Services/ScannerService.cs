@@ -17,6 +17,7 @@ using IOFile = System.IO.File;
 using NTwain;
 using NTwain.Data;
 using Microsoft.Win32;
+using System.Runtime.Versioning;
 
 namespace AgentDMS.Core.Services;
 
@@ -308,6 +309,7 @@ public class ScannerService : IScannerService, IDisposable
             diagnostics["TwainDirectories"] = directoryInfo;
 
             // Check registry keys
+#pragma warning disable CA1416 // Registry operations are Windows-specific, but this code is already guarded by Windows platform check
             var registryPaths = new[]
             {
                 @"SOFTWARE\TWAIN_32\",
@@ -323,7 +325,7 @@ public class ScannerService : IScannerService, IDisposable
                 {
                     using var key = Registry.LocalMachine.OpenSubKey(path);
                     var exists = key != null;
-                    var subKeys = exists ? key.GetSubKeyNames() : new string[0];
+                    var subKeys = key?.GetSubKeyNames() ?? new string[0];
                     
                     registryInfo.Add(new
                     {
@@ -344,6 +346,7 @@ public class ScannerService : IScannerService, IDisposable
                 }
             }
             diagnostics["RegistryKeys"] = registryInfo;
+#pragma warning restore CA1416
 
             // Try TWAIN session
             try
@@ -637,6 +640,7 @@ public class ScannerService : IScannerService, IDisposable
         {
             _logger?.LogInformation("Scanning Windows registry for TWAIN data sources...");
             
+#pragma warning disable CA1416 // Registry operations are Windows-specific, but this code is already guarded by Windows platform check
             // Registry paths where TWAIN data sources are typically registered
             var registryPaths = new[]
             {
@@ -708,6 +712,7 @@ public class ScannerService : IScannerService, IDisposable
                     _logger?.LogWarning(ex, "Error scanning registry path: HKLM\\{Path}", basePath);
                 }
             }
+#pragma warning restore CA1416
         });
         
         return scanners;
