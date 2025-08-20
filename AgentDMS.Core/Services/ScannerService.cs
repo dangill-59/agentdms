@@ -11,6 +11,8 @@ using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.Fonts;
 using IOPath = System.IO.Path;
 using IODirectory = System.IO.Directory;
+using NTwain;
+using NTwain.Data;
 
 namespace AgentDMS.Core.Services;
 
@@ -47,21 +49,87 @@ public class ScannerService : IScannerService, IDisposable
         {
             if (_isRealScanner)
             {
-                // TODO: Add real TWAIN scanner detection when running on Windows
-                _logger?.LogInformation("Real scanner detection not yet implemented");
+                // Add real TWAIN scanner detection when running on Windows
+                _logger?.LogInformation("Detecting real TWAIN scanners...");
+                var twainScanners = await GetTwainScannersAsync();
+                scanners.AddRange(twainScanners);
+                _logger?.LogInformation("Found {Count} real TWAIN scanners", twainScanners.Count);
             }
             
-            // Always provide mock scanners for development and testing
-            scanners.AddRange(GetMockScanners());
+            // Provide mock scanners for development and testing when no real scanners found
+            if (scanners.Count == 0)
+            {
+                scanners.AddRange(GetMockScanners());
+                _logger?.LogInformation("No real scanners found, using mock scanners");
+            }
             
-            _logger?.LogInformation("Found {Count} scanners", scanners.Count);
+            _logger?.LogInformation("Total scanners available: {Count}", scanners.Count);
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Error enumerating scanners");
+            // Fallback to mock scanners on error
+            scanners.Clear();
+            scanners.AddRange(GetMockScanners());
         }
 
         await Task.CompletedTask;
+        return scanners;
+    }
+
+    /// <summary>
+    /// Get real TWAIN scanners available on the system
+    /// </summary>
+    private async Task<List<ScannerInfo>> GetTwainScannersAsync()
+    {
+        var scanners = new List<ScannerInfo>();
+        
+        try
+        {
+            await Task.Run(() =>
+            {
+                // Initialize TWAIN session
+                var session = new TwainSession(TWIdentity.CreateFromAssembly(DataGroups.Image, typeof(ScannerService).Assembly));
+                
+                try
+                {
+                    session.Open();
+                    
+                    // Get list of available TWAIN data sources (scanners)
+                    foreach (var source in session.GetSources())
+                    {
+                        var scannerInfo = new ScannerInfo
+                        {
+                            DeviceId = $"twain_{source.Name}",
+                            Name = source.Name?.Trim() ?? "Unknown TWAIN Scanner",
+                            Manufacturer = source.Manufacturer?.Trim() ?? "Unknown",
+                            Model = source.ProductFamily?.Trim() ?? "TWAIN Scanner",
+                            IsAvailable = true,
+                            IsDefault = scanners.Count == 0, // First scanner is default
+                            Capabilities = new Dictionary<string, object>
+                            {
+                                ["Type"] = "TWAIN",
+                                ["Version"] = source.Version.Info ?? "Unknown",
+                                ["DataSource"] = source.Name ?? "Unknown"
+                            }
+                        };
+                        
+                        scanners.Add(scannerInfo);
+                        _logger?.LogInformation("Found TWAIN scanner: {Name} by {Manufacturer}", 
+                            scannerInfo.Name, scannerInfo.Manufacturer);
+                    }
+                }
+                finally
+                {
+                    session.Close();
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Failed to enumerate TWAIN scanners. This is normal if no TWAIN drivers are installed.");
+        }
+        
         return scanners;
     }
 
