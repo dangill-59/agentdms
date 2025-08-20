@@ -1395,12 +1395,9 @@ async function performScan(isPreview = false) {
         document.getElementById('scanResult').innerHTML = '';
         
         // Start scan
-        const endpoint = isPreview ? '/api/ImageProcessing/scan/preview' : '/api/ImageProcessing/scan';
+        const endpoint = isPreview ? 'ImageProcessing/scan/preview' : 'ImageProcessing/scan';
         const result = await apiCall(endpoint, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
             body: JSON.stringify(scanRequest)
         });
         
