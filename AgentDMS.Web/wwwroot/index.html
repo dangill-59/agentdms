@@ -33,6 +33,9 @@
                         <button class="nav-link active" id="upload-tab" data-bs-toggle="tab" data-bs-target="#upload" type="button" role="tab">
                             <i class="bi bi-upload"></i> Upload & Process
                         </button>
+                        <button class="nav-link" id="scan-tab" data-bs-toggle="tab" data-bs-target="#scan" type="button" role="tab">
+                            <i class="bi bi-printer"></i> Scan Document
+                        </button>
                         <button class="nav-link" id="batch-tab" data-bs-toggle="tab" data-bs-target="#batch" type="button" role="tab">
                             <i class="bi bi-collection"></i> Batch Process
                         </button>
@@ -109,6 +112,138 @@
                                             <i class="bi bi-image" style="font-size: 3rem;"></i>
                                             <p class="mt-2">Images will appear here</p>
                                         </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Scan Document Tab -->
+                <div class="tab-pane fade" id="scan" role="tabpanel">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="bi bi-printer"></i> Scan Document</h5>
+                                </div>
+                                <div class="card-body">
+                                    <!-- Scanner Selection -->
+                                    <div class="mb-3">
+                                        <label for="scannerSelect" class="form-label">Available Scanners</label>
+                                        <select class="form-select" id="scannerSelect">
+                                            <option value="">Loading scanners...</option>
+                                        </select>
+                                        <div class="form-text">Select a scanner from the available devices</div>
+                                    </div>
+
+                                    <!-- Scan Settings -->
+                                    <div class="row mb-3">
+                                        <div class="col-md-4">
+                                            <label for="scanResolution" class="form-label">Resolution (DPI)</label>
+                                            <select class="form-select" id="scanResolution">
+                                                <option value="150">150 DPI (Fast)</option>
+                                                <option value="300" selected>300 DPI (Standard)</option>
+                                                <option value="600">600 DPI (High Quality)</option>
+                                                <option value="1200">1200 DPI (Archive)</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label for="scanColorMode" class="form-label">Color Mode</label>
+                                            <select class="form-select" id="scanColorMode">
+                                                <option value="2">Color</option>
+                                                <option value="1">Grayscale</option>
+                                                <option value="0">Black & White</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label for="scanFormat" class="form-label">Output Format</label>
+                                            <select class="form-select" id="scanFormat">
+                                                <option value="0">PNG</option>
+                                                <option value="1">JPEG</option>
+                                                <option value="2">TIFF</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <!-- Scan Options -->
+                                    <div class="row mb-3">
+                                        <div class="col-md-6">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="showScannerUI" value="true">
+                                                <label class="form-check-label" for="showScannerUI">
+                                                    Show Scanner Interface
+                                                </label>
+                                                <div class="form-text">Display the scanner's native interface for advanced settings</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="autoProcess" value="true" checked>
+                                                <label class="form-check-label" for="autoProcess">
+                                                    Auto-process scanned image
+                                                </label>
+                                                <div class="form-text">Automatically process the scanned image through the processing pipeline</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Scan Buttons -->
+                                    <div class="d-flex gap-2 mb-3">
+                                        <button type="button" class="btn btn-primary" id="startScanBtn">
+                                            <i class="bi bi-printer"></i> Start Scan
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary" id="previewScanBtn">
+                                            <i class="bi bi-eye"></i> Preview Scan
+                                        </button>
+                                        <button type="button" class="btn btn-outline-info" id="refreshScannersBtn">
+                                            <i class="bi bi-arrow-clockwise"></i> Refresh Scanners
+                                        </button>
+                                    </div>
+
+                                    <!-- Scanner Status -->
+                                    <div id="scannerStatus" class="alert alert-info" style="display: none;">
+                                        <i class="bi bi-info-circle"></i>
+                                        <span id="scannerStatusText">Ready to scan</span>
+                                    </div>
+
+                                    <!-- Scan Progress -->
+                                    <div id="scanProgress" class="mt-3" style="display: none;">
+                                        <div class="progress-container">
+                                            <div class="progress">
+                                                <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                                     role="progressbar" style="width: 0%"></div>
+                                            </div>
+                                            <div id="scanProgressStatus" class="progress-status">Scanning...</div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Scan Results -->
+                                    <div id="scanResult" class="mt-3"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Scanner Information Panel -->
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="bi bi-info-circle"></i> Scanner Information</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div id="scannerInfo">
+                                        <p class="text-muted">Select a scanner to view information</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="card mt-3">
+                                <div class="card-header">
+                                    <h5><i class="bi bi-gear"></i> Platform Capabilities</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div id="platformCapabilities">
+                                        <p class="text-muted">Loading capabilities...</p>
                                     </div>
                                 </div>
                             </div>
