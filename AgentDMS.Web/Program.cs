@@ -19,6 +19,9 @@ builder.Services.AddSingleton<IBackgroundJobService, BackgroundJobService>();
 builder.Services.AddHostedService<BackgroundJobService>(provider => 
     (BackgroundJobService)provider.GetRequiredService<IBackgroundJobService>());
 
+// Add Scanner Service
+builder.Services.AddSingleton<IScannerService, ScannerService>();
+
 // Add Mistral Configuration Service
 builder.Services.AddSingleton<IMistralConfigService, MistralConfigService>();
 

@@ -16,6 +16,9 @@ async function init() {
     // Load Mistral configuration
     loadMistralConfig();
     
+    // Initialize scanner functionality
+    await initializeScannerInterface();
+    
     // Bind event handlers
     bindEventHandlers();
     
@@ -1181,4 +1184,299 @@ function updateTemperatureDisplay() {
     const temperatureSlider = document.getElementById('mistralTemperature');
     const temperatureValue = document.getElementById('temperatureValue');
     temperatureValue.textContent = temperatureSlider.value;
+}
+
+// Scanner functionality
+let availableScanners = [];
+let scannerCapabilities = null;
+
+async function initializeScannerInterface() {
+    try {
+        // Load available scanners
+        await loadAvailableScanners();
+        
+        // Load scanner capabilities
+        await loadScannerCapabilities();
+        
+        // Bind scanner event handlers
+        bindScannerEventHandlers();
+        
+        console.log('Scanner interface initialized');
+    } catch (error) {
+        console.error('Error initializing scanner interface:', error);
+        showScannerStatus('Error initializing scanner interface', 'danger');
+    }
+}
+
+async function loadAvailableScanners() {
+    try {
+        const response = await apiCall('/api/ImageProcessing/scanners');
+        availableScanners = response || [];
+        
+        const scannerSelect = document.getElementById('scannerSelect');
+        scannerSelect.innerHTML = '';
+        
+        if (availableScanners.length === 0) {
+            scannerSelect.innerHTML = '<option value="">No scanners found</option>';
+            showScannerStatus('No scanners found. This may be a development environment with mock scanners.', 'warning');
+        } else {
+            availableScanners.forEach((scanner, index) => {
+                const option = document.createElement('option');
+                option.value = scanner.deviceId;
+                option.textContent = `${scanner.name} (${scanner.manufacturer})`;
+                if (scanner.isDefault) {
+                    option.selected = true;
+                }
+                scannerSelect.appendChild(option);
+            });
+            
+            // Update scanner info for the selected scanner
+            updateScannerInfo();
+        }
+    } catch (error) {
+        console.error('Error loading scanners:', error);
+        const scannerSelect = document.getElementById('scannerSelect');
+        scannerSelect.innerHTML = '<option value="">Error loading scanners</option>';
+        showScannerStatus('Error loading scanners: ' + error.message, 'danger');
+    }
+}
+
+async function loadScannerCapabilities() {
+    try {
+        const response = await apiCall('/api/ImageProcessing/scanners/capabilities');
+        scannerCapabilities = response;
+        updatePlatformCapabilities();
+    } catch (error) {
+        console.error('Error loading scanner capabilities:', error);
+        showScannerStatus('Error loading scanner capabilities: ' + error.message, 'warning');
+    }
+}
+
+function bindScannerEventHandlers() {
+    // Scanner selection change
+    const scannerSelect = document.getElementById('scannerSelect');
+    scannerSelect?.addEventListener('change', updateScannerInfo);
+    
+    // Start scan button
+    const startScanBtn = document.getElementById('startScanBtn');
+    startScanBtn?.addEventListener('click', startScan);
+    
+    // Preview scan button
+    const previewScanBtn = document.getElementById('previewScanBtn');
+    previewScanBtn?.addEventListener('click', previewScan);
+    
+    // Refresh scanners button
+    const refreshScannersBtn = document.getElementById('refreshScannersBtn');
+    refreshScannersBtn?.addEventListener('click', refreshScanners);
+}
+
+function updateScannerInfo() {
+    const scannerSelect = document.getElementById('scannerSelect');
+    const selectedDeviceId = scannerSelect.value;
+    const selectedScanner = availableScanners.find(s => s.deviceId === selectedDeviceId);
+    
+    const scannerInfoDiv = document.getElementById('scannerInfo');
+    
+    if (selectedScanner) {
+        scannerInfoDiv.innerHTML = `
+            <h6>${selectedScanner.name}</h6>
+            <p><strong>Manufacturer:</strong> ${selectedScanner.manufacturer}</p>
+            <p><strong>Model:</strong> ${selectedScanner.model}</p>
+            <p><strong>Status:</strong> <span class="badge bg-${selectedScanner.isAvailable ? 'success' : 'danger'}">${selectedScanner.isAvailable ? 'Available' : 'Unavailable'}</span></p>
+            ${selectedScanner.isDefault ? '<p><span class="badge bg-primary">Default Scanner</span></p>' : ''}
+            ${Object.keys(selectedScanner.capabilities || {}).length > 0 ? 
+                '<div class="mt-2"><small class="text-muted">Capabilities: ' + 
+                JSON.stringify(selectedScanner.capabilities, null, 2).slice(1, -1) + 
+                '</small></div>' : ''}
+        `;
+    } else {
+        scannerInfoDiv.innerHTML = '<p class="text-muted">No scanner selected</p>';
+    }
+}
+
+function updatePlatformCapabilities() {
+    const capabilitiesDiv = document.getElementById('platformCapabilities');
+    
+    if (scannerCapabilities) {
+        const supports = [];
+        if (scannerCapabilities.supportsTwain) supports.push('TWAIN');
+        if (scannerCapabilities.supportsWia) supports.push('WIA');
+        if (scannerCapabilities.supportsSane) supports.push('SANE');
+        
+        capabilitiesDiv.innerHTML = `
+            <div class="mb-2">
+                <strong>Supported APIs:</strong><br>
+                ${supports.length > 0 ? supports.join(', ') : 'Mock Scanner Only'}
+            </div>
+            <div class="mb-2">
+                <strong>Color Modes:</strong><br>
+                ${scannerCapabilities.supportedColorModes.map(mode => 
+                    mode === 0 ? 'B&W' : mode === 1 ? 'Grayscale' : 'Color'
+                ).join(', ')}
+            </div>
+            <div class="mb-2">
+                <strong>Formats:</strong><br>
+                ${scannerCapabilities.supportedFormats.map(format => 
+                    format === 0 ? 'PNG' : format === 1 ? 'JPEG' : 'TIFF'
+                ).join(', ')}
+            </div>
+            <div class="mb-2">
+                <strong>Resolution:</strong><br>
+                ${scannerCapabilities.resolutionRange[0]} - ${scannerCapabilities.resolutionRange[1]} DPI
+            </div>
+            <div>
+                <small class="text-muted">${scannerCapabilities.platformInfo}</small>
+            </div>
+        `;
+    } else {
+        capabilitiesDiv.innerHTML = '<p class="text-muted">Capabilities not available</p>';
+    }
+}
+
+async function refreshScanners() {
+    const refreshBtn = document.getElementById('refreshScannersBtn');
+    const originalText = refreshBtn.innerHTML;
+    
+    try {
+        refreshBtn.innerHTML = '<i class="bi bi-arrow-clockwise spin"></i> Refreshing...';
+        refreshBtn.disabled = true;
+        
+        await loadAvailableScanners();
+        showScannerStatus('Scanners refreshed successfully', 'success');
+        
+        setTimeout(() => {
+            hideScannerStatus();
+        }, 3000);
+    } catch (error) {
+        console.error('Error refreshing scanners:', error);
+        showScannerStatus('Error refreshing scanners: ' + error.message, 'danger');
+    } finally {
+        refreshBtn.innerHTML = originalText;
+        refreshBtn.disabled = false;
+    }
+}
+
+async function startScan() {
+    await performScan(false);
+}
+
+async function previewScan() {
+    await performScan(true);
+}
+
+async function performScan(isPreview = false) {
+    const scannerSelect = document.getElementById('scannerSelect');
+    const scanResolution = document.getElementById('scanResolution');
+    const scanColorMode = document.getElementById('scanColorMode');
+    const scanFormat = document.getElementById('scanFormat');
+    const showScannerUI = document.getElementById('showScannerUI');
+    const autoProcess = document.getElementById('autoProcess');
+    
+    const scanRequest = {
+        scannerDeviceId: scannerSelect.value,
+        resolution: parseInt(scanResolution.value),
+        colorMode: parseInt(scanColorMode.value),
+        format: parseInt(scanFormat.value),
+        showUserInterface: isPreview || showScannerUI.checked,
+        autoProcess: !isPreview && autoProcess.checked
+    };
+    
+    const scanBtn = isPreview ? document.getElementById('previewScanBtn') : document.getElementById('startScanBtn');
+    const originalText = scanBtn.innerHTML;
+    
+    try {
+        // Disable buttons and show progress
+        scanBtn.innerHTML = `<i class="bi bi-hourglass-split"></i> ${isPreview ? 'Previewing...' : 'Scanning...'}`;
+        scanBtn.disabled = true;
+        showScanProgress();
+        showScannerStatus(`${isPreview ? 'Preview scan' : 'Scan'} in progress...`, 'info');
+        
+        // Clear previous results
+        document.getElementById('scanResult').innerHTML = '';
+        
+        // Start scan
+        const endpoint = isPreview ? '/api/ImageProcessing/scan/preview' : '/api/ImageProcessing/scan';
+        const result = await apiCall(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(scanRequest)
+        });
+        
+        hideScanProgress();
+        
+        if (result.success) {
+            showScanResult(result, isPreview);
+            showScannerStatus(`${isPreview ? 'Preview scan' : 'Scan'} completed successfully!`, 'success');
+            
+            // Auto-hide success message
+            setTimeout(() => {
+                hideScannerStatus();
+            }, 5000);
+        } else {
+            showScannerStatus(`${isPreview ? 'Preview scan' : 'Scan'} failed: ${result.errorMessage}`, 'danger');
+        }
+    } catch (error) {
+        hideScanProgress();
+        console.error('Scan error:', error);
+        showScannerStatus(`${isPreview ? 'Preview scan' : 'Scan'} error: ${error.message}`, 'danger');
+    } finally {
+        scanBtn.innerHTML = originalText;
+        scanBtn.disabled = false;
+    }
+}
+
+function showScanResult(result, isPreview) {
+    const resultDiv = document.getElementById('scanResult');
+    const imageUrl = convertToHttpUrl(result.scannedFilePath);
+    
+    resultDiv.innerHTML = `
+        <div class="alert alert-success">
+            <h6><i class="bi bi-check-circle"></i> ${isPreview ? 'Preview Scan' : 'Scan'} Completed</h6>
+            <p><strong>File:</strong> ${result.fileName}</p>
+            <p><strong>Scanner:</strong> ${result.scannerUsed}</p>
+            <p><strong>Time:</strong> ${new Date(result.scanTime).toLocaleString()}</p>
+            ${result.processingJobId ? `<p><strong>Processing Job ID:</strong> ${result.processingJobId}</p>` : ''}
+        </div>
+        
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">Scanned Image</h6>
+                <button class="btn btn-sm btn-outline-primary" onclick="openImageModal('${imageUrl}', '${result.fileName}')">
+                    <i class="bi bi-zoom-in"></i> View Full Size
+                </button>
+            </div>
+            <div class="card-body text-center">
+                <img src="${imageUrl}" alt="${result.fileName}" class="img-fluid rounded" style="max-height: 400px;">
+            </div>
+        </div>
+    `;
+}
+
+function showScannerStatus(message, type = 'info') {
+    const statusDiv = document.getElementById('scannerStatus');
+    const statusText = document.getElementById('scannerStatusText');
+    
+    statusDiv.className = `alert alert-${type}`;
+    statusText.textContent = message;
+    statusDiv.style.display = 'block';
+}
+
+function hideScannerStatus() {
+    const statusDiv = document.getElementById('scannerStatus');
+    statusDiv.style.display = 'none';
+}
+
+function showScanProgress() {
+    const progressDiv = document.getElementById('scanProgress');
+    const progressBar = progressDiv.querySelector('.progress-bar');
+    
+    progressBar.style.width = '50%';
+    progressDiv.style.display = 'block';
+}
+
+function hideScanProgress() {
+    const progressDiv = document.getElementById('scanProgress');
+    progressDiv.style.display = 'none';
 }

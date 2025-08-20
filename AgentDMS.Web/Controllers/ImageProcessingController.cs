@@ -15,6 +15,7 @@ public class ImageProcessingController : ControllerBase
     private readonly FileUploadService _fileUploadService;
     private readonly IProgressBroadcaster _progressBroadcaster;
     private readonly IBackgroundJobService _backgroundJobService;
+    private readonly IScannerService _scannerService;
     private readonly ILogger<ImageProcessingController> _logger;
 
     public ImageProcessingController(
@@ -22,12 +23,14 @@ public class ImageProcessingController : ControllerBase
         FileUploadService fileUploadService,
         IProgressBroadcaster progressBroadcaster,
         IBackgroundJobService backgroundJobService,
+        IScannerService scannerService,
         ILogger<ImageProcessingController> logger)
     {
         _imageProcessor = imageProcessor;
         _fileUploadService = fileUploadService;
         _progressBroadcaster = progressBroadcaster;
         _backgroundJobService = backgroundJobService;
+        _scannerService = scannerService;
         _logger = logger;
     }
 
@@ -280,6 +283,111 @@ public class ImageProcessingController : ControllerBase
         {
             _logger.LogError(ex, "Error generating gallery");
             return StatusCode(500, new { error = "Internal server error", message = ex.Message });
+        }
+    }
+
+    // Scanner endpoints
+    [HttpGet("scanners")]
+    public async Task<ActionResult<IEnumerable<ScannerInfo>>> GetAvailableScanners()
+    {
+        try
+        {
+            var scanners = await _scannerService.GetAvailableScannersAsync();
+            return Ok(scanners);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting available scanners");
+            return StatusCode(500, new { error = "Failed to get scanners", message = ex.Message });
+        }
+    }
+
+    [HttpGet("scanners/capabilities")]
+    public async Task<ActionResult<ScannerCapabilities>> GetScannerCapabilities()
+    {
+        try
+        {
+            var capabilities = await _scannerService.GetCapabilitiesAsync();
+            return Ok(capabilities);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting scanner capabilities");
+            return StatusCode(500, new { error = "Failed to get scanner capabilities", message = ex.Message });
+        }
+    }
+
+    [HttpPost("scan")]
+    public async Task<ActionResult<ScanResult>> ScanDocument([FromBody] ScanRequest request)
+    {
+        try
+        {
+            if (!_scannerService.IsScanningAvailable())
+            {
+                return BadRequest(new { error = "Scanning is not available on this system" });
+            }
+
+            var result = await _scannerService.ScanAsync(request);
+            
+            if (!result.Success)
+            {
+                return BadRequest(new { error = "Scan failed", message = result.ErrorMessage });
+            }
+
+            // If auto-processing is enabled and scan was successful, enqueue for processing
+            if (request.AutoProcess && !string.IsNullOrEmpty(result.ScannedFilePath))
+            {
+                try
+                {
+                    var jobId = await _backgroundJobService.EnqueueJobAsync(result.ScannedFilePath);
+                    result.ProcessingJobId = jobId;
+                    _logger.LogInformation("Scanned document queued for processing. Job ID: {JobId}", jobId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to enqueue scanned document for processing");
+                    // Don't fail the scan operation if processing queue fails
+                }
+            }
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during scan operation");
+            return StatusCode(500, new { error = "Scan operation failed", message = ex.Message });
+        }
+    }
+
+    [HttpPost("scan/preview")]
+    public async Task<ActionResult<ScanResult>> PreviewScan([FromBody] ScanRequest request)
+    {
+        try
+        {
+            // For preview, always disable auto-processing and show UI
+            var previewRequest = new ScanRequest
+            {
+                ScannerDeviceId = request.ScannerDeviceId,
+                Resolution = request.Resolution,
+                ColorMode = request.ColorMode,
+                Format = request.Format,
+                ShowUserInterface = true,
+                AutoProcess = false
+            };
+
+            var result = await _scannerService.ScanAsync(previewRequest);
+            
+            if (!result.Success)
+            {
+                return BadRequest(new { error = "Preview scan failed", message = result.ErrorMessage });
+            }
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during preview scan operation");
+            return StatusCode(500, new { error = "Preview scan failed", message = ex.Message });
         }
     }
 }
