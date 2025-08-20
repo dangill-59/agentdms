@@ -4,11 +4,13 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- Suppress NU1701 warning for NTwain package - it works fine with .NET 8.0 despite targeting .NET Framework -->
+    <NoWarn>$(NoWarn);NU1701</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="itext7" Version="9.2.0" />
-    <PackageReference Include="NTwain" Version="3.7.2" />
+    <PackageReference Include="NTwain" Version="3.7.5" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.11" />
     <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.1.7" />
     <PackageReference Include="Magick.NET-Q16-AnyCPU" Version="14.7.0" />

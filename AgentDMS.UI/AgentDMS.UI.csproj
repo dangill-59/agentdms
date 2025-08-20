@@ -9,6 +9,8 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- Suppress NU1701 warning for NTwain package - it works fine with .NET 8.0 despite targeting .NET Framework -->
+    <NoWarn>$(NoWarn);NU1701</NoWarn>
   </PropertyGroup>
 
 </Project>
