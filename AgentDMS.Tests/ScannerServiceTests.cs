@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using AgentDMS.Core.Services;
 using Microsoft.Extensions.Logging;
 using System.Linq;
+using System.IO;
 
 namespace AgentDMS.Tests;
 
@@ -78,5 +79,82 @@ public class ScannerServiceTests
 
         // Assert
         Assert.True(isAvailable);
+    }
+
+    [Fact]
+    public async Task GetAvailableScannersAsync_ShouldIncludeDetailedLogging()
+    {
+        // Arrange
+        var loggedMessages = new List<string>();
+        var logger = new TestLogger<ScannerService>(loggedMessages);
+        using var scannerService = new ScannerService(logger);
+
+        // Act
+        var scanners = await scannerService.GetAvailableScannersAsync();
+
+        // Assert
+        Assert.NotNull(scanners);
+        Assert.NotEmpty(scanners);
+        
+        // Verify that detailed logging occurred - check for any scanner-related logging
+        var hasInitLogging = loggedMessages.Any(msg => msg.Contains("Scanner service initialized"));
+        var hasScannerLogging = loggedMessages.Any(msg => 
+            msg.Contains("real scanners") || 
+            msg.Contains("mock scanners") || 
+            msg.Contains("Total scanners available"));
+        
+        Assert.True(hasInitLogging, "Should log scanner service initialization");
+        Assert.True(hasScannerLogging, "Should log scanner detection process");
+    }
+
+    [Fact] 
+    public async Task GetAvailableScannersAsync_OnWindows_ShouldAttemptTwainDetection()
+    {
+        // Arrange
+        var loggedMessages = new List<string>();
+        var logger = new TestLogger<ScannerService>(loggedMessages);
+        using var scannerService = new ScannerService(logger);
+
+        // Act
+        var scanners = await scannerService.GetAvailableScannersAsync();
+
+        // Assert
+        Assert.NotNull(scanners);
+        
+        if (OperatingSystem.IsWindows())
+        {
+            // On Windows, should log real scanner support and attempt TWAIN detection
+            var hasRealScannerLogging = loggedMessages.Any(msg => 
+                msg.Contains("Real scanner support") || 
+                msg.Contains("real TWAIN scanners") ||
+                msg.Contains("real scanners"));
+            Assert.True(hasRealScannerLogging, "Should attempt real scanner detection on Windows");
+        }
+        
+        // Should always have at least mock scanners
+        Assert.NotEmpty(scanners);
+    }
+}
+
+/// <summary>
+/// Test logger that captures log messages for verification
+/// </summary>
+public class TestLogger<T> : ILogger<T>
+{
+    private readonly List<string> _loggedMessages;
+
+    public TestLogger(List<string> loggedMessages)
+    {
+        _loggedMessages = loggedMessages;
+    }
+
+    public IDisposable? BeginScope<TState>(TState state) => null;
+
+    public bool IsEnabled(LogLevel logLevel) => true;
+
+    public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+    {
+        var message = formatter(state, exception);
+        _loggedMessages.Add(message);
     }
 }
