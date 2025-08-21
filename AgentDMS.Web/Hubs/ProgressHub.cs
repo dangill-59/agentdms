@@ -33,11 +33,20 @@ public class SignalRProgressBroadcaster : IProgressBroadcaster
 {
     private readonly IHubContext<ProgressHub> _hubContext;
 
+    /// <summary>
+    /// Initializes a new instance of the SignalRProgressBroadcaster class
+    /// </summary>
+    /// <param name="hubContext">The hub context for SignalR communication</param>
     public SignalRProgressBroadcaster(IHubContext<ProgressHub> hubContext)
     {
         _hubContext = hubContext;
     }
 
+    /// <summary>
+    /// Broadcasts progress update to all clients in the specified job group
+    /// </summary>
+    /// <param name="jobId">The job identifier</param>
+    /// <param name="progress">The progress report to broadcast</param>
     public async Task BroadcastProgress(string jobId, ProgressReport progress)
     {
         await _hubContext.Clients.Group($"job_{jobId}").SendAsync("ProgressUpdate", progress);
