@@ -7,6 +7,9 @@
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <!-- Suppress NU1701 warning for NTwain package - it works fine with .NET 8.0 despite targeting .NET Framework -->
     <NoWarn>$(NoWarn);NU1701</NoWarn>
+    <!-- Generate XML documentation for Swagger -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <DocumentationFile>bin\$(Configuration)\$(TargetFramework)\$(AssemblyName).xml</DocumentationFile>
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,6 +18,7 @@
 
   <ItemGroup>
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.4.0" />
+    <PackageReference Include="Swashbuckle.AspNetCore.Annotations" Version="6.4.0" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR" Version="1.1.0" />
   </ItemGroup>
 

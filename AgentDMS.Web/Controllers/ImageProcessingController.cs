@@ -4,11 +4,18 @@ using AgentDMS.Core.Models;
 using AgentDMS.Core.Utilities;
 using AgentDMS.Web.Hubs;
 using System.ComponentModel.DataAnnotations;
+using Swashbuckle.AspNetCore.Annotations;
+using Microsoft.AspNetCore.Http;
 
 namespace AgentDMS.Web.Controllers;
 
+/// <summary>
+/// Controller for image processing operations including upload, scanning, and batch processing
+/// </summary>
 [ApiController]
 [Route("api/[controller]")]
+[Produces("application/json")]
+[SwaggerTag("Image Processing operations including file upload, scanning, and conversion")]
 public class ImageProcessingController : ControllerBase
 {
     private readonly ImageProcessingService _imageProcessor;
@@ -18,6 +25,15 @@ public class ImageProcessingController : ControllerBase
     private readonly IScannerService _scannerService;
     private readonly ILogger<ImageProcessingController> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the ImageProcessingController
+    /// </summary>
+    /// <param name="imageProcessor">Image processing service</param>
+    /// <param name="fileUploadService">File upload service</param>
+    /// <param name="progressBroadcaster">Progress broadcasting service</param>
+    /// <param name="backgroundJobService">Background job service</param>
+    /// <param name="scannerService">Scanner service</param>
+    /// <param name="logger">Logger instance</param>
     public ImageProcessingController(
         ImageProcessingService imageProcessor, 
         FileUploadService fileUploadService,
@@ -34,14 +50,39 @@ public class ImageProcessingController : ControllerBase
         _logger = logger;
     }
 
+    /// <summary>
+    /// Get supported file formats for image processing
+    /// </summary>
+    /// <returns>List of supported file extensions</returns>
+    /// <response code="200">Returns the list of supported file formats</response>
     [HttpGet("formats")]
+    [SwaggerOperation(Summary = "Get supported file formats", Description = "Returns a list of all supported file extensions for image processing")]
+    [SwaggerResponse(200, "List of supported file formats", typeof(IEnumerable<string>))]
+    [ProducesResponseType(typeof(IEnumerable<string>), StatusCodes.Status200OK)]
     public ActionResult<IEnumerable<string>> GetSupportedFormats()
     {
         return Ok(ImageProcessingService.GetSupportedExtensions());
     }
 
+    /// <summary>
+    /// Upload and process an image file
+    /// </summary>
+    /// <param name="file">The image file to upload and process</param>
+    /// <returns>Upload response with job ID for tracking processing status</returns>
+    /// <response code="200">File uploaded successfully and processing started</response>
+    /// <response code="400">No file uploaded or invalid file</response>
+    /// <response code="500">Internal server error during upload</response>
     [HttpPost("upload")]
-    public async Task<ActionResult<UploadResponse>> UploadAndProcessImage(IFormFile file)
+    [SwaggerOperation(Summary = "Upload and process image", Description = "Uploads an image file and starts background processing. Returns a job ID for tracking progress.")]
+    [SwaggerResponse(200, "File uploaded successfully", typeof(UploadResponse))]
+    [SwaggerResponse(400, "Bad request - no file or invalid file")]
+    [SwaggerResponse(500, "Internal server error")]
+    [ProducesResponseType(typeof(UploadResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    [Consumes("multipart/form-data")]
+    public async Task<ActionResult<UploadResponse>> UploadAndProcessImage(
+        [SwaggerParameter("Image file to upload")] IFormFile file)
     {
         if (file == null || file.Length == 0)
         {
@@ -83,8 +124,27 @@ public class ImageProcessingController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Get job processing status
+    /// </summary>
+    /// <param name="jobId">The job ID to check status for</param>
+    /// <returns>Current status of the processing job</returns>
+    /// <response code="200">Job status retrieved successfully</response>
+    /// <response code="400">Invalid job ID</response>
+    /// <response code="404">Job not found</response>
+    /// <response code="500">Internal server error</response>
     [HttpGet("job/{jobId}/status")]
-    public async Task<ActionResult<JobStatusResponse>> GetJobStatus(string jobId)
+    [SwaggerOperation(Summary = "Get job status", Description = "Retrieves the current status of a processing job by its ID")]
+    [SwaggerResponse(200, "Job status retrieved", typeof(JobStatusResponse))]
+    [SwaggerResponse(400, "Invalid job ID")]
+    [SwaggerResponse(404, "Job not found")]
+    [SwaggerResponse(500, "Internal server error")]
+    [ProducesResponseType(typeof(JobStatusResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<JobStatusResponse>> GetJobStatus(
+        [SwaggerParameter("Job ID to check status for")] string jobId)
     {
         if (string.IsNullOrWhiteSpace(jobId))
         {
@@ -114,8 +174,30 @@ public class ImageProcessingController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Get job processing result
+    /// </summary>
+    /// <param name="jobId">The job ID to get results for</param>
+    /// <returns>Processing result if job is completed</returns>
+    /// <response code="200">Job completed successfully, returns processing result</response>
+    /// <response code="202">Job is still processing</response>
+    /// <response code="400">Invalid job ID</response>
+    /// <response code="404">Job not found</response>
+    /// <response code="500">Job failed or internal server error</response>
     [HttpGet("job/{jobId}/result")]
-    public async Task<ActionResult<ProcessingResult>> GetJobResult(string jobId)
+    [SwaggerOperation(Summary = "Get job result", Description = "Retrieves the processing result for a completed job")]
+    [SwaggerResponse(200, "Job completed successfully", typeof(ProcessingResult))]
+    [SwaggerResponse(202, "Job is still processing")]
+    [SwaggerResponse(400, "Invalid job ID")]
+    [SwaggerResponse(404, "Job not found")]
+    [SwaggerResponse(500, "Job failed or internal server error")]
+    [ProducesResponseType(typeof(ProcessingResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<ProcessingResult>> GetJobResult(
+        [SwaggerParameter("Job ID to get results for")] string jobId)
     {
         if (string.IsNullOrWhiteSpace(jobId))
         {
@@ -154,6 +236,26 @@ public class ImageProcessingController : ControllerBase
             return StatusCode(500, new { error = "Internal server error", message = ex.Message });
         }
     }
+    
+    /// <summary>
+    /// Process an image file by file path
+    /// </summary>
+    /// <param name="request">Request containing the file path to process</param>
+    /// <returns>Processing result with job ID</returns>
+    /// <response code="200">File processed successfully</response>
+    /// <response code="400">Invalid file path</response>
+    /// <response code="404">File not found</response>
+    /// <response code="500">Internal server error during processing</response>
+    [HttpPost("process")]
+    [SwaggerOperation(Summary = "Process image by path", Description = "Processes an image file located at the specified file path")]
+    [SwaggerResponse(200, "File processed successfully", typeof(ProcessingResult))]
+    [SwaggerResponse(400, "Invalid file path")]
+    [SwaggerResponse(404, "File not found")]
+    [SwaggerResponse(500, "Internal server error")]
+    [ProducesResponseType(typeof(ProcessingResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<ProcessingResult>> ProcessImageByPath([FromBody] ProcessImageRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.FilePath))
@@ -197,7 +299,22 @@ public class ImageProcessingController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Process multiple images in batch
+    /// </summary>
+    /// <param name="request">Request containing list of file paths to process</param>
+    /// <returns>Batch processing results with job ID</returns>
+    /// <response code="200">Batch processing started successfully</response>
+    /// <response code="400">No file paths provided</response>
+    /// <response code="500">Internal server error during batch processing</response>
     [HttpPost("batch-process")]
+    [SwaggerOperation(Summary = "Batch process multiple images", Description = "Processes multiple images simultaneously with progress tracking")]
+    [SwaggerResponse(200, "Batch processing started", typeof(IEnumerable<ProcessingResult>))]
+    [SwaggerResponse(400, "No file paths provided")]
+    [SwaggerResponse(500, "Internal server error")]
+    [ProducesResponseType(typeof(IEnumerable<ProcessingResult>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<IEnumerable<ProcessingResult>>> ProcessMultipleImages([FromBody] BatchProcessRequest request)
     {
         if (request.FilePaths == null || !request.FilePaths.Any())
@@ -254,7 +371,22 @@ public class ImageProcessingController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Generate thumbnail gallery from images
+    /// </summary>
+    /// <param name="request">Request containing image paths and gallery settings</param>
+    /// <returns>Gallery generation result with output path</returns>
+    /// <response code="200">Gallery generated successfully</response>
+    /// <response code="400">No image paths provided</response>
+    /// <response code="500">Internal server error during gallery generation</response>
     [HttpPost("generate-gallery")]
+    [SwaggerOperation(Summary = "Generate thumbnail gallery", Description = "Creates an HTML gallery with thumbnails from the provided image paths")]
+    [SwaggerResponse(200, "Gallery generated successfully", typeof(GalleryResult))]
+    [SwaggerResponse(400, "No image paths provided")]
+    [SwaggerResponse(500, "Internal server error")]
+    [ProducesResponseType(typeof(GalleryResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<GalleryResult>> GenerateThumbnailGallery([FromBody] GalleryRequest request)
     {
         if (request.ImagePaths == null || !request.ImagePaths.Any())
@@ -287,7 +419,18 @@ public class ImageProcessingController : ControllerBase
     }
 
     // Scanner endpoints
+    /// <summary>
+    /// Get list of available scanners
+    /// </summary>
+    /// <returns>List of available scanner devices</returns>
+    /// <response code="200">List of available scanners retrieved successfully</response>
+    /// <response code="500">Error retrieving scanner information</response>
     [HttpGet("scanners")]
+    [SwaggerOperation(Summary = "Get available scanners", Description = "Retrieves a list of all available scanner devices on the system")]
+    [SwaggerResponse(200, "List of available scanners", typeof(IEnumerable<ScannerInfo>))]
+    [SwaggerResponse(500, "Error retrieving scanner information")]
+    [ProducesResponseType(typeof(IEnumerable<ScannerInfo>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<IEnumerable<ScannerInfo>>> GetAvailableScanners()
     {
         try
@@ -302,7 +445,18 @@ public class ImageProcessingController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Get scanner capabilities
+    /// </summary>
+    /// <returns>Scanner capabilities and supported features</returns>
+    /// <response code="200">Scanner capabilities retrieved successfully</response>
+    /// <response code="500">Error retrieving scanner capabilities</response>
     [HttpGet("scanners/capabilities")]
+    [SwaggerOperation(Summary = "Get scanner capabilities", Description = "Retrieves the capabilities and supported features of the scanner system")]
+    [SwaggerResponse(200, "Scanner capabilities", typeof(ScannerCapabilities))]
+    [SwaggerResponse(500, "Error retrieving scanner capabilities")]
+    [ProducesResponseType(typeof(ScannerCapabilities), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<ScannerCapabilities>> GetScannerCapabilities()
     {
         try
@@ -317,7 +471,22 @@ public class ImageProcessingController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Scan a document using connected scanner
+    /// </summary>
+    /// <param name="request">Scan configuration and settings</param>
+    /// <returns>Scan result with file path and optional processing job ID</returns>
+    /// <response code="200">Document scanned successfully</response>
+    /// <response code="400">Scanning not available or scan failed</response>
+    /// <response code="500">Internal server error during scanning</response>
     [HttpPost("scan")]
+    [SwaggerOperation(Summary = "Scan document", Description = "Scans a document using the specified scanner with configurable settings. Optionally queues for automatic processing.")]
+    [SwaggerResponse(200, "Document scanned successfully", typeof(ScanResult))]
+    [SwaggerResponse(400, "Scanning not available or scan failed")]
+    [SwaggerResponse(500, "Internal server error")]
+    [ProducesResponseType(typeof(ScanResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<ScanResult>> ScanDocument([FromBody] ScanRequest request)
     {
         try
@@ -359,7 +528,22 @@ public class ImageProcessingController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Preview scan with scanner UI
+    /// </summary>
+    /// <param name="request">Scan preview configuration</param>
+    /// <returns>Preview scan result</returns>
+    /// <response code="200">Preview scan completed successfully</response>
+    /// <response code="400">Preview scan failed</response>
+    /// <response code="500">Internal server error during preview scanning</response>
     [HttpPost("scan/preview")]
+    [SwaggerOperation(Summary = "Preview scan", Description = "Performs a preview scan with the scanner user interface enabled, without auto-processing")]
+    [SwaggerResponse(200, "Preview scan completed", typeof(ScanResult))]
+    [SwaggerResponse(400, "Preview scan failed")]
+    [SwaggerResponse(500, "Internal server error")]
+    [ProducesResponseType(typeof(ScanResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<ScanResult>> PreviewScan([FromBody] ScanRequest request)
     {
         try
@@ -392,48 +576,145 @@ public class ImageProcessingController : ControllerBase
     }
 }
 
-// DTOs for API requests
+// DTOs for API requests and responses
+
+/// <summary>
+/// Request model for processing an image by file path
+/// </summary>
 public class ProcessImageRequest
 {
+    /// <summary>
+    /// Full file path to the image to be processed
+    /// </summary>
+    /// <example>C:\Images\document.pdf</example>
     [Required]
+    [SwaggerSchema("Full file path to the image file")]
     public string FilePath { get; set; } = string.Empty;
 }
 
+/// <summary>
+/// Request model for batch processing multiple images
+/// </summary>
 public class BatchProcessRequest
 {
+    /// <summary>
+    /// List of file paths to process in batch
+    /// </summary>
+    /// <example>["C:\Images\image1.jpg", "C:\Images\image2.png"]</example>
     [Required]
+    [SwaggerSchema("List of file paths to process")]
     public IEnumerable<string> FilePaths { get; set; } = new List<string>();
 }
 
+/// <summary>
+/// Request model for generating thumbnail gallery
+/// </summary>
 public class GalleryRequest
 {
+    /// <summary>
+    /// List of image file paths to include in gallery
+    /// </summary>
+    /// <example>["C:\Images\photo1.jpg", "C:\Images\photo2.png"]</example>
     [Required]
+    [SwaggerSchema("List of image file paths")]
     public IEnumerable<string> ImagePaths { get; set; } = new List<string>();
+    
+    /// <summary>
+    /// Output directory for the generated gallery (optional)
+    /// </summary>
+    /// <example>C:\Gallery\Output</example>
+    [SwaggerSchema("Optional output directory path")]
     public string? OutputDirectory { get; set; }
+    
+    /// <summary>
+    /// Thumbnail size in pixels (optional, default: 200)
+    /// </summary>
+    /// <example>150</example>
+    [SwaggerSchema("Thumbnail size in pixels")]
     public int? ThumbnailSize { get; set; }
+    
+    /// <summary>
+    /// Gallery title (optional)
+    /// </summary>
+    /// <example>My Photo Gallery</example>
+    [SwaggerSchema("Gallery title")]
     public string? Title { get; set; }
 }
 
+/// <summary>
+/// Result of gallery generation
+/// </summary>
 public class GalleryResult
 {
+    /// <summary>
+    /// Path to the generated gallery HTML file
+    /// </summary>
     public string GalleryPath { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// Output directory containing gallery files
+    /// </summary>
     public string OutputDirectory { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// Total number of images included in the gallery
+    /// </summary>
     public int TotalImages { get; set; }
 }
 
+/// <summary>
+/// Response model for file upload operations
+/// </summary>
 public class UploadResponse
 {
+    /// <summary>
+    /// Unique job identifier for tracking processing status
+    /// </summary>
     public string JobId { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// Original uploaded file name
+    /// </summary>
     public string FileName { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// File size in bytes
+    /// </summary>
     public long FileSize { get; set; }
+    
+    /// <summary>
+    /// Status message
+    /// </summary>
     public string Message { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// Current processing status
+    /// </summary>
     public string Status { get; set; } = string.Empty;
 }
 
+/// <summary>
+/// Response model for job status queries
+/// </summary>
 public class JobStatusResponse
 {
+    /// <summary>
+    /// Job identifier
+    /// </summary>
     public string JobId { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// Current job status (Queued, Processing, Completed, Failed)
+    /// </summary>
     public string Status { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// Job creation timestamp
+    /// </summary>
     public DateTime CreatedAt { get; set; }
+    
+    /// <summary>
+    /// Error message if job failed
+    /// </summary>
     public string? ErrorMessage { get; set; }
 }

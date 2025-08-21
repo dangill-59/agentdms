@@ -29,6 +29,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\AgentDMS.Core\AgentDMS.Core.csproj" />
+    <ProjectReference Include="..\AgentDMS.Web\AgentDMS.Web.csproj" />
   </ItemGroup>
 
 </Project>

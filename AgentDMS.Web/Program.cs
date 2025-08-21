@@ -1,13 +1,59 @@
 using AgentDMS.Core.Services;
 using AgentDMS.Web.Hubs;
 using AgentDMS.Web.Services;
+using Microsoft.OpenApi.Models;
+using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+
+// Enhanced Swagger configuration
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Version = "v1",
+        Title = "AgentDMS API",
+        Description = "A comprehensive API for AgentDMS - Image Processing and Document Management System",
+        Contact = new OpenApiContact
+        {
+            Name = "AgentDMS Support",
+            Email = "support@agentdms.com"
+        },
+        License = new OpenApiLicense
+        {
+            Name = "MIT License",
+            Url = new Uri("https://opensource.org/licenses/MIT")
+        }
+    });
+
+    // Include XML comments
+    var xmlFilename = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFilename);
+    if (File.Exists(xmlPath))
+    {
+        options.IncludeXmlComments(xmlPath);
+    }
+
+    // Add security definition for future API key authentication if needed
+    options.AddSecurityDefinition("ApiKey", new OpenApiSecurityScheme
+    {
+        Type = SecuritySchemeType.ApiKey,
+        In = ParameterLocation.Header,
+        Name = "X-API-Key",
+        Description = "API Key authentication"
+    });
+
+    // Enable annotations for better documentation
+    options.EnableAnnotations();
+    
+    // Group endpoints by tags
+    options.TagActionsBy(api => new[] { api.GroupName ?? api.ActionDescriptor.RouteValues["controller"] });
+    options.DocInclusionPredicate((name, api) => true);
+});
 
 // Add SignalR
 builder.Services.AddSignalR();
@@ -105,7 +151,29 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint("/swagger/v1/swagger.json", "AgentDMS API v1");
+        options.RoutePrefix = "swagger";
+        options.DisplayRequestDuration();
+        options.DocExpansion(Swashbuckle.AspNetCore.SwaggerUI.DocExpansion.None);
+        options.DefaultModelExpandDepth(2);
+        options.DefaultModelRendering(Swashbuckle.AspNetCore.SwaggerUI.ModelRendering.Example);
+        options.ShowExtensions();
+        options.EnableTryItOutByDefault();
+    });
+}
+else
+{
+    // Enable Swagger in production for API documentation
+    // Note: In production, consider adding authentication/authorization to protect the Swagger UI
+    app.UseSwagger();
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint("/swagger/v1/swagger.json", "AgentDMS API v1");
+        options.RoutePrefix = "api-docs";
+        options.DocumentTitle = "AgentDMS API Documentation";
+    });
 }
 
 app.UseCors();
