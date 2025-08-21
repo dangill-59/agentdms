@@ -121,6 +121,15 @@ app.UseStaticFiles(new StaticFileOptions
     RequestPath = "/AgentDMS_Output"
 });
 
+// Configure static file serving for AgentDMS_Scans directory
+var scansDirectory = Path.Combine(Path.GetTempPath(), "AgentDMS_Scans");
+Directory.CreateDirectory(scansDirectory);
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(scansDirectory),
+    RequestPath = "/AgentDMS_Scans"
+});
+
 app.UseRouting();
 app.MapControllers();
 

@@ -161,19 +161,23 @@ function convertToHttpUrl(filePath) {
     if (!filePath) return '';
     
     // Check if it's already an HTTP URL
-    if (filePath.startsWith('http://') || filePath.startsWith('https://') || filePath.startsWith('/')) {
+    if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
         return filePath;
     }
     
     // Convert absolute file path to HTTP URL
-    // Extract the AgentDMS_Output part and everything after it
-    const outputFolderName = 'AgentDMS_Output';
-    const outputIndex = filePath.indexOf(outputFolderName);
+    // Check for both AgentDMS_Output and AgentDMS_Scans directories
+    const outputFolders = ['AgentDMS_Output', 'AgentDMS_Scans'];
     
-    if (outputIndex !== -1) {
-        // Extract the relative path from AgentDMS_Output onwards
-        const relativePath = filePath.substring(outputIndex);
-        return '/' + relativePath.replace(/\\/g, '/'); // Normalize path separators
+    for (const outputFolderName of outputFolders) {
+        const outputIndex = filePath.indexOf(outputFolderName);
+        
+        if (outputIndex !== -1) {
+            // Extract the relative path from the output folder onwards
+            // This handles both Windows (C:\...\AgentDMS_Scans\file.png) and Unix (/tmp/AgentDMS_Scans/file.png)
+            const relativePath = filePath.substring(outputIndex);
+            return '/' + relativePath.replace(/\\/g, '/'); // Normalize path separators
+        }
     }
     
     // Fallback: return empty string if we can't convert
