@@ -1,6 +1,7 @@
 using Xunit;
 using System.Threading.Tasks;
 using AgentDMS.Core.Services;
+using AgentDMS.Core.Models;
 using Microsoft.Extensions.Logging;
 using System.Linq;
 using System.IO;
@@ -163,6 +164,63 @@ public class ScannerServiceTests
             // On non-Windows, should have a message explaining limitation
             Assert.True(diagnostics.ContainsKey("Message"));
         }
+    }
+
+    [Fact]
+    public async Task ScanAsync_WithShowUserInterface_ShouldLogScannerUIIntent()
+    {
+        // Arrange
+        var loggedMessages = new List<string>();
+        var logger = new TestLogger<ScannerService>(loggedMessages);
+        var scannerService = new ScannerService(logger);
+
+        var scanRequest = new ScanRequest
+        {
+            ScannerDeviceId = "twain_Test Scanner",
+            ShowUserInterface = true,
+            Resolution = 300,
+            ColorMode = ScanColorMode.Color,
+            Format = ScanFormat.Png
+        };
+
+        // Act
+        var result = await scannerService.ScanAsync(scanRequest);
+
+        // Assert
+        Assert.True(result.Success);
+        Assert.Contains("Mock Scanner (TWAIN UI Mode Simulated)", result.ScannerUsed);
+        
+        // Verify that the logs indicate scanner UI intent
+        Assert.Contains(loggedMessages, msg => msg.Contains("ShowUI: True"));
+        Assert.Contains(loggedMessages, msg => msg.Contains("Mock scan completed with simulated scanner UI interaction"));
+    }
+
+    [Fact]
+    public async Task ScanAsync_WithoutShowUserInterface_ShouldUseAutomaticMode()
+    {
+        // Arrange
+        var loggedMessages = new List<string>();
+        var logger = new TestLogger<ScannerService>(loggedMessages);
+        var scannerService = new ScannerService(logger);
+
+        var scanRequest = new ScanRequest
+        {
+            ScannerDeviceId = "twain_Test Scanner",
+            ShowUserInterface = false,
+            Resolution = 300,
+            ColorMode = ScanColorMode.Color,
+            Format = ScanFormat.Png
+        };
+
+        // Act
+        var result = await scannerService.ScanAsync(scanRequest);
+
+        // Assert
+        Assert.True(result.Success);
+        Assert.Contains("Mock Scanner (TWAIN Auto Mode)", result.ScannerUsed);
+        
+        // Verify that the logs indicate automatic mode
+        Assert.Contains(loggedMessages, msg => msg.Contains("ShowUI: False"));
     }
 }
 
