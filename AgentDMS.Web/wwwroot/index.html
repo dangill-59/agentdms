@@ -476,6 +476,71 @@
         </main>
     </div>
 
+    <!-- Scanner Configuration Modal -->
+    <div id="scannerConfigModal" class="modal fade" tabindex="-1" aria-labelledby="scannerConfigModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="scannerConfigModalLabel">
+                        <i class="bi bi-gear"></i> Scanner Configuration
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="modalScanResolution" class="form-label">Resolution (DPI)</label>
+                                <select class="form-select" id="modalScanResolution">
+                                    <option value="150">150 DPI (Draft)</option>
+                                    <option value="300" selected>300 DPI (Standard)</option>
+                                    <option value="600">600 DPI (High Quality)</option>
+                                    <option value="1200">1200 DPI (Archival)</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="modalScanColorMode" class="form-label">Color Mode</label>
+                                <select class="form-select" id="modalScanColorMode">
+                                    <option value="0">Black & White</option>
+                                    <option value="1">Grayscale</option>
+                                    <option value="2" selected>Color</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="modalScanFormat" class="form-label">Output Format</label>
+                                <select class="form-select" id="modalScanFormat">
+                                    <option value="0" selected>PNG</option>
+                                    <option value="1">JPEG</option>
+                                    <option value="2">TIFF</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="modalAutoProcess" checked>
+                                    <label class="form-check-label" for="modalAutoProcess">
+                                        Auto-process scanned image
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        Configure your scanner settings above and click "Start Scan" to proceed with scanning using these settings.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="modalStartScanBtn">
+                        <i class="bi bi-play-fill"></i> Start Scan
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Image Modal/Lightbox -->
     <div id="imageModal" class="image-modal" style="display: none;">
         <div class="image-modal-overlay" onclick="closeImageModal()">
