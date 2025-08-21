@@ -174,9 +174,14 @@ public class ScannerServiceTests
         var logger = new TestLogger<ScannerService>(loggedMessages);
         var scannerService = new ScannerService(logger);
 
+        // Get available scanners to use a valid scanner device ID
+        var availableScanned = await scannerService.GetAvailableScannersAsync();
+        var twainScanner = availableScanned.FirstOrDefault(s => s.DeviceId.StartsWith("twain_")) 
+                          ?? availableScanned.First(); // fallback to first scanner
+
         var scanRequest = new ScanRequest
         {
-            ScannerDeviceId = "twain_Test Scanner",
+            ScannerDeviceId = twainScanner.DeviceId,
             ShowUserInterface = true,
             Resolution = 300,
             ColorMode = ScanColorMode.Color,
@@ -188,11 +193,10 @@ public class ScannerServiceTests
 
         // Assert
         Assert.True(result.Success);
-        Assert.Contains("Mock Scanner (TWAIN UI Mode Simulated)", result.ScannerUsed);
+        Assert.Equal(twainScanner.Name, result.ScannerUsed);
         
         // Verify that the logs indicate scanner UI intent
         Assert.Contains(loggedMessages, msg => msg.Contains("ShowUI: True"));
-        Assert.Contains(loggedMessages, msg => msg.Contains("Mock scan completed with simulated scanner UI interaction"));
     }
 
     [Fact]
@@ -203,9 +207,14 @@ public class ScannerServiceTests
         var logger = new TestLogger<ScannerService>(loggedMessages);
         var scannerService = new ScannerService(logger);
 
+        // Get available scanners to use a valid scanner device ID
+        var availableScanned = await scannerService.GetAvailableScannersAsync();
+        var twainScanner = availableScanned.FirstOrDefault(s => s.DeviceId.StartsWith("twain_")) 
+                          ?? availableScanned.First(); // fallback to first scanner
+
         var scanRequest = new ScanRequest
         {
-            ScannerDeviceId = "twain_Test Scanner",
+            ScannerDeviceId = twainScanner.DeviceId,
             ShowUserInterface = false,
             Resolution = 300,
             ColorMode = ScanColorMode.Color,
@@ -217,10 +226,39 @@ public class ScannerServiceTests
 
         // Assert
         Assert.True(result.Success);
-        Assert.Contains("Mock Scanner (TWAIN Auto Mode)", result.ScannerUsed);
+        Assert.Equal(twainScanner.Name, result.ScannerUsed);
         
         // Verify that the logs indicate automatic mode
         Assert.Contains(loggedMessages, msg => msg.Contains("ShowUI: False"));
+    }
+
+    [Fact]
+    public async Task ScanAsync_ShouldUseSelectedScannerName()
+    {
+        // Arrange
+        var scannerService = new ScannerService();
+        
+        // Get available scanners first to get a valid device ID and name
+        var availableScanned = await scannerService.GetAvailableScannersAsync();
+        var selectedScanner = availableScanned.First();
+
+        var scanRequest = new ScanRequest
+        {
+            ScannerDeviceId = selectedScanner.DeviceId,
+            ShowUserInterface = false,
+            Resolution = 300,
+            ColorMode = ScanColorMode.Color,
+            Format = ScanFormat.Png
+        };
+
+        // Act
+        var result = await scannerService.ScanAsync(scanRequest);
+
+        // Assert
+        Assert.True(result.Success);
+        Assert.Equal(selectedScanner.Name, result.ScannerUsed);
+        Assert.NotNull(result.ScannedFilePath);
+        Assert.NotNull(result.FileName);
     }
 }
 
