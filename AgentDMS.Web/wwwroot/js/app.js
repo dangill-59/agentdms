@@ -1365,15 +1365,8 @@ async function refreshScanners() {
 }
 
 async function startScan() {
-    const showScannerUI = document.getElementById('showScannerUI');
-    
-    if (showScannerUI && showScannerUI.checked) {
-        // Show the scanner configuration modal instead of scanning directly
-        showScannerConfigModal(false);
-    } else {
-        // Perform scan directly without showing the modal
-        await performScan(false);
-    }
+    // Always perform scan directly - let the backend handle native scanner interface when ShowUserInterface is true
+    await performScan(false);
 }
 
 async function previewScan() {
