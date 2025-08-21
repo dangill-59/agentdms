@@ -1512,6 +1512,9 @@ function showScannerConfigModal(isPreview = false) {
     // Show the modal using Bootstrap
     const modalInstance = new bootstrap.Modal(modal);
     modalInstance.show();
+    
+    // Ensure aria-hidden is removed when modal is shown for accessibility
+    modal.removeAttribute('aria-hidden');
 }
 
 function syncSettingsToModal() {
@@ -1578,6 +1581,8 @@ function handleModalScan() {
     const modalInstance = bootstrap.Modal.getInstance(modal);
     if (modalInstance) {
         modalInstance.hide();
+        // Restore aria-hidden for accessibility
+        modal.setAttribute('aria-hidden', 'true');
     }
     
     // Perform the scan with the configured settings
