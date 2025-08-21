@@ -226,8 +226,14 @@ public class ScannerService : IScannerService, IDisposable
             result.ScannedFilePath = outputPath;
             result.FileName = fileName;
             
-            // Provide more descriptive scanner information based on UI mode
-            if (request.ShowUserInterface && !string.IsNullOrEmpty(request.ScannerDeviceId) && request.ScannerDeviceId.StartsWith("twain_"))
+            // Use the actual scanner name from the selected scanner, not a hardcoded mock name
+            var selectedScanner = await FindScannerByDeviceIdAsync(request.ScannerDeviceId);
+            if (selectedScanner != null)
+            {
+                result.ScannerUsed = selectedScanner.Name;
+                _logger?.LogInformation("Scan completed using scanner: {ScannerName}", selectedScanner.Name);
+            }
+            else if (request.ShowUserInterface && !string.IsNullOrEmpty(request.ScannerDeviceId) && request.ScannerDeviceId.StartsWith("twain_"))
             {
                 result.ScannerUsed = $"Mock Scanner (TWAIN UI Mode Simulated)";
                 _logger?.LogInformation("Mock scan completed with simulated scanner UI interaction");
@@ -258,6 +264,18 @@ public class ScannerService : IScannerService, IDisposable
     public bool IsScanningAvailable()
     {
         return true; // Mock scanner is always available
+    }
+
+    /// <summary>
+    /// Find a scanner by device ID from the available scanners
+    /// </summary>
+    private async Task<ScannerInfo?> FindScannerByDeviceIdAsync(string? deviceId)
+    {
+        if (string.IsNullOrEmpty(deviceId))
+            return null;
+
+        var availableScanned = await GetAvailableScannersAsync();
+        return availableScanned.FirstOrDefault(s => s.DeviceId == deviceId);
     }
 
     /// <summary>
