@@ -274,7 +274,7 @@ public class TestLogger<T> : ILogger<T>
         _loggedMessages = loggedMessages;
     }
 
-    public IDisposable? BeginScope<TState>(TState state) => null;
+    public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
 
     public bool IsEnabled(LogLevel logLevel) => true;
 
