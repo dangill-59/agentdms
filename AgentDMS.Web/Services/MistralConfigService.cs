@@ -8,8 +8,21 @@ namespace AgentDMS.Web.Services;
 /// </summary>
 public interface IMistralConfigService
 {
+    /// <summary>
+    /// Gets the current Mistral configuration asynchronously
+    /// </summary>
+    /// <returns>The current Mistral configuration</returns>
     Task<MistralConfig> GetConfigAsync();
+    
+    /// <summary>
+    /// Updates the Mistral configuration asynchronously
+    /// </summary>
+    /// <param name="config">The new configuration to save</param>
     Task UpdateConfigAsync(MistralConfig config);
+    
+    /// <summary>
+    /// Event raised when the configuration changes
+    /// </summary>
     event EventHandler<MistralConfig>? ConfigChanged;
 }
 
@@ -22,14 +35,26 @@ public class MistralConfigService : IMistralConfigService
     private readonly ILogger<MistralConfigService> _logger;
     private MistralConfig? _cachedConfig;
     
+    /// <summary>
+    /// Event raised when the configuration changes
+    /// </summary>
     public event EventHandler<MistralConfig>? ConfigChanged;
 
+    /// <summary>
+    /// Initializes a new instance of the MistralConfigService class
+    /// </summary>
+    /// <param name="env">The web host environment</param>
+    /// <param name="logger">The logger instance</param>
     public MistralConfigService(IWebHostEnvironment env, ILogger<MistralConfigService> logger)
     {
         _configFilePath = Path.Combine(env.ContentRootPath, "App_Data", "mistralconfig.json");
         _logger = logger;
     }
 
+    /// <summary>
+    /// Gets the current Mistral configuration asynchronously
+    /// </summary>
+    /// <returns>The current Mistral configuration</returns>
     public async Task<MistralConfig> GetConfigAsync()
     {
         if (_cachedConfig == null)
@@ -40,6 +65,10 @@ public class MistralConfigService : IMistralConfigService
         return _cachedConfig ?? new MistralConfig();
     }
 
+    /// <summary>
+    /// Updates the Mistral configuration asynchronously
+    /// </summary>
+    /// <param name="config">The new configuration to save</param>
     public async Task UpdateConfigAsync(MistralConfig config)
     {
         try
