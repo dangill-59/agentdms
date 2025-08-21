@@ -1272,6 +1272,10 @@ function bindScannerEventHandlers() {
     // Refresh scanners button
     const refreshScannersBtn = document.getElementById('refreshScannersBtn');
     refreshScannersBtn?.addEventListener('click', refreshScanners);
+    
+    // Modal start scan button
+    const modalStartScanBtn = document.getElementById('modalStartScanBtn');
+    modalStartScanBtn?.addEventListener('click', handleModalScan);
 }
 
 function updateScannerInfo() {
@@ -1361,11 +1365,20 @@ async function refreshScanners() {
 }
 
 async function startScan() {
-    await performScan(false);
+    const showScannerUI = document.getElementById('showScannerUI');
+    
+    if (showScannerUI && showScannerUI.checked) {
+        // Show the scanner configuration modal instead of scanning directly
+        showScannerConfigModal(false);
+    } else {
+        // Perform scan directly without showing the modal
+        await performScan(false);
+    }
 }
 
 async function previewScan() {
-    await performScan(true);
+    // Preview scans always show the scanner interface (modal)
+    showScannerConfigModal(true);
 }
 
 async function performScan(isPreview = false) {
@@ -1480,4 +1493,100 @@ function showScanProgress() {
 function hideScanProgress() {
     const progressDiv = document.getElementById('scanProgress');
     progressDiv.style.display = 'none';
+}
+
+// Scanner configuration modal functions
+function showScannerConfigModal(isPreview = false) {
+    // Sync current settings with modal
+    syncSettingsToModal();
+    
+    // Store the scan type for later use
+    const modal = document.getElementById('scannerConfigModal');
+    modal.setAttribute('data-is-preview', isPreview.toString());
+    
+    // Update modal title and button text based on scan type
+    const modalTitle = document.getElementById('scannerConfigModalLabel');
+    const modalButton = document.getElementById('modalStartScanBtn');
+    
+    if (isPreview) {
+        modalTitle.innerHTML = '<i class="bi bi-eye"></i> Preview Scan Configuration';
+        modalButton.innerHTML = '<i class="bi bi-eye"></i> Start Preview';
+    } else {
+        modalTitle.innerHTML = '<i class="bi bi-gear"></i> Scanner Configuration';
+        modalButton.innerHTML = '<i class="bi bi-play-fill"></i> Start Scan';
+    }
+    
+    // Show the modal using Bootstrap
+    const modalInstance = new bootstrap.Modal(modal);
+    modalInstance.show();
+}
+
+function syncSettingsToModal() {
+    // Copy current settings from main form to modal
+    const scanResolution = document.getElementById('scanResolution');
+    const scanColorMode = document.getElementById('scanColorMode');
+    const scanFormat = document.getElementById('scanFormat');
+    const autoProcess = document.getElementById('autoProcess');
+    
+    const modalScanResolution = document.getElementById('modalScanResolution');
+    const modalScanColorMode = document.getElementById('modalScanColorMode');
+    const modalScanFormat = document.getElementById('modalScanFormat');
+    const modalAutoProcess = document.getElementById('modalAutoProcess');
+    
+    if (scanResolution && modalScanResolution) {
+        modalScanResolution.value = scanResolution.value;
+    }
+    if (scanColorMode && modalScanColorMode) {
+        modalScanColorMode.value = scanColorMode.value;
+    }
+    if (scanFormat && modalScanFormat) {
+        modalScanFormat.value = scanFormat.value;
+    }
+    if (autoProcess && modalAutoProcess) {
+        modalAutoProcess.checked = autoProcess.checked;
+    }
+}
+
+function syncSettingsFromModal() {
+    // Copy settings from modal back to main form
+    const scanResolution = document.getElementById('scanResolution');
+    const scanColorMode = document.getElementById('scanColorMode');
+    const scanFormat = document.getElementById('scanFormat');
+    const autoProcess = document.getElementById('autoProcess');
+    
+    const modalScanResolution = document.getElementById('modalScanResolution');
+    const modalScanColorMode = document.getElementById('modalScanColorMode');
+    const modalScanFormat = document.getElementById('modalScanFormat');
+    const modalAutoProcess = document.getElementById('modalAutoProcess');
+    
+    if (scanResolution && modalScanResolution) {
+        scanResolution.value = modalScanResolution.value;
+    }
+    if (scanColorMode && modalScanColorMode) {
+        scanColorMode.value = modalScanColorMode.value;
+    }
+    if (scanFormat && modalScanFormat) {
+        scanFormat.value = modalScanFormat.value;
+    }
+    if (autoProcess && modalAutoProcess) {
+        autoProcess.checked = modalAutoProcess.checked;
+    }
+}
+
+function handleModalScan() {
+    // Sync settings back to main form
+    syncSettingsFromModal();
+    
+    // Get the scan type from the modal
+    const modal = document.getElementById('scannerConfigModal');
+    const isPreview = modal.getAttribute('data-is-preview') === 'true';
+    
+    // Close the modal
+    const modalInstance = bootstrap.Modal.getInstance(modal);
+    if (modalInstance) {
+        modalInstance.hide();
+    }
+    
+    // Perform the scan with the configured settings
+    performScan(isPreview);
 }
