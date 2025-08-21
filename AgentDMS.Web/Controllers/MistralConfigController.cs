@@ -2,16 +2,27 @@ using Microsoft.AspNetCore.Mvc;
 using AgentDMS.Web.Models;
 using AgentDMS.Web.Services;
 using System.Text.Json;
+using Swashbuckle.AspNetCore.Annotations;
 
 namespace AgentDMS.Web.Controllers;
 
+/// <summary>
+/// Controller for managing Mistral LLM configuration settings
+/// </summary>
 [ApiController]
 [Route("api/[controller]")]
+[Produces("application/json")]
+[SwaggerTag("Mistral LLM configuration management")]
 public class MistralConfigController : ControllerBase
 {
     private readonly ILogger<MistralConfigController> _logger;
     private readonly IMistralConfigService _configService;
 
+    /// <summary>
+    /// Initializes a new instance of the MistralConfigController
+    /// </summary>
+    /// <param name="logger">Logger instance</param>
+    /// <param name="configService">Mistral configuration service</param>
     public MistralConfigController(ILogger<MistralConfigController> logger, IMistralConfigService configService)
     {
         _logger = logger;
@@ -21,7 +32,15 @@ public class MistralConfigController : ControllerBase
     /// <summary>
     /// Get current Mistral configuration settings
     /// </summary>
+    /// <returns>Current Mistral LLM configuration</returns>
+    /// <response code="200">Configuration retrieved successfully</response>
+    /// <response code="500">Error reading configuration</response>
     [HttpGet]
+    [SwaggerOperation(Summary = "Get Mistral configuration", Description = "Retrieves the current Mistral LLM configuration settings")]
+    [SwaggerResponse(200, "Current configuration", typeof(MistralConfig))]
+    [SwaggerResponse(500, "Error reading configuration")]
+    [ProducesResponseType(typeof(MistralConfig), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<MistralConfig>> GetConfig()
     {
         try
@@ -39,7 +58,19 @@ public class MistralConfigController : ControllerBase
     /// <summary>
     /// Update Mistral configuration settings
     /// </summary>
+    /// <param name="config">New configuration settings</param>
+    /// <returns>Updated configuration</returns>
+    /// <response code="200">Configuration updated successfully</response>
+    /// <response code="400">Invalid configuration data</response>
+    /// <response code="500">Error updating configuration</response>
     [HttpPost]
+    [SwaggerOperation(Summary = "Update Mistral configuration", Description = "Updates the Mistral LLM configuration settings with new values")]
+    [SwaggerResponse(200, "Configuration updated", typeof(MistralConfig))]
+    [SwaggerResponse(400, "Invalid configuration data")]
+    [SwaggerResponse(500, "Error updating configuration")]
+    [ProducesResponseType(typeof(MistralConfig), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<MistralConfig>> UpdateConfig([FromBody] MistralConfig config)
     {
         try
@@ -64,7 +95,16 @@ public class MistralConfigController : ControllerBase
     /// <summary>
     /// Test Mistral configuration by validating endpoint accessibility
     /// </summary>
+    /// <param name="config">Configuration to test</param>
+    /// <returns>Test result indicating success or failure</returns>
+    /// <response code="200">Configuration test successful</response>
+    /// <response code="400">Invalid configuration or test failed</response>
     [HttpPost("test")]
+    [SwaggerOperation(Summary = "Test Mistral configuration", Description = "Validates the Mistral configuration by testing connectivity to the API endpoint")]
+    [SwaggerResponse(200, "Configuration test successful")]
+    [SwaggerResponse(400, "Invalid configuration or test failed")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult> TestConfig([FromBody] MistralConfig config)
     {
         try

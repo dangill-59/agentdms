@@ -1,6 +1,6 @@
 # AgentDMS - Image Processing Utility
 
-A comprehensive C# utility for image file processing with support for multiple formats, multipage documents, and thumbnail generation.
+A comprehensive C# utility for image file processing with support for multiple formats, multipage documents, and thumbnail generation. Includes REST API with full Swagger documentation.
 
 ## Features
 
@@ -12,6 +12,8 @@ A comprehensive C# utility for image file processing with support for multiple f
 ✅ **Interactive CLI**: User-friendly command-line interface for testing and operation  
 ✅ **HTML Gallery**: Generates responsive thumbnail galleries with full-image preview  
 ✅ **Error Handling**: Comprehensive error handling and progress reporting  
+✅ **REST API**: Full REST API with Swagger documentation for integration  
+✅ **Real-time Updates**: SignalR integration for live progress tracking  
 
 ## Architecture
 
@@ -19,7 +21,7 @@ The solution consists of four main projects:
 
 - **AgentDMS.Core**: Core functionality with services and utilities
 - **AgentDMS.UI**: Command-line interface for testing and demonstration  
-- **AgentDMS.Web**: Web-based HTML interface for browser access
+- **AgentDMS.Web**: Web-based interface and REST API with Swagger documentation
 - **AgentDMS.Tests**: Unit tests for core functionality
 
 ### Core Components
@@ -48,6 +50,55 @@ dotnet run --project AgentDMS.Web
 - **Gallery Generation**: Create thumbnail galleries with customizable sizes
 - **Format Support**: View all supported formats with descriptions
 - **Mistral Settings**: Configure Mistral LLM integration for document AI
+
+### REST API
+
+AgentDMS provides a comprehensive REST API for programmatic access:
+
+**API Documentation:**
+- **Swagger UI**: `http://localhost:5249/swagger` (Development) or `http://localhost:5249/api-docs` (Production)
+- **API Info**: `GET /api/apidocumentation/info` - Get API overview and endpoint information
+- **Health Check**: `GET /api/apidocumentation/health` - Check API health status
+
+**Key API Endpoints:**
+
+**Image Processing:**
+- `GET /api/imageprocessing/formats` - Get supported file formats
+- `POST /api/imageprocessing/upload` - Upload and process image
+- `POST /api/imageprocessing/process` - Process image by file path
+- `POST /api/imageprocessing/batch-process` - Batch process multiple images
+- `POST /api/imageprocessing/generate-gallery` - Generate thumbnail gallery
+- `GET /api/imageprocessing/job/{jobId}/status` - Get job status
+- `GET /api/imageprocessing/job/{jobId}/result` - Get job result
+
+**Scanner Operations:**
+- `GET /api/imageprocessing/scanners` - Get available scanners
+- `GET /api/imageprocessing/scanners/capabilities` - Get scanner capabilities
+- `POST /api/imageprocessing/scan` - Scan document
+- `POST /api/imageprocessing/scan/preview` - Preview scan
+
+**Mistral Configuration:**
+- `GET /api/mistralconfig` - Get current configuration
+- `POST /api/mistralconfig` - Update configuration
+- `POST /api/mistralconfig/test` - Test configuration
+
+**Example API Usage:**
+
+```bash
+# Get supported formats
+curl -X GET "http://localhost:5249/api/imageprocessing/formats"
+
+# Upload and process an image
+curl -X POST "http://localhost:5249/api/imageprocessing/upload" \
+  -H "Content-Type: multipart/form-data" \
+  -F "file=@path/to/image.jpg"
+
+# Check job status
+curl -X GET "http://localhost:5249/api/imageprocessing/job/{jobId}/status"
+
+# Get API information
+curl -X GET "http://localhost:5249/api/apidocumentation/info"
+```
 
 ### Mistral LLM Integration
 
