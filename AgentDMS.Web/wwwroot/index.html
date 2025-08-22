@@ -247,6 +247,74 @@
                                     </div>
                                 </div>
                             </div>
+
+                            <div class="card mt-3">
+                                <div class="card-header">
+                                    <h5><i class="bi bi-router"></i> Remote Scanning Guide</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="alert alert-info">
+                                        <i class="bi bi-info-circle"></i>
+                                        <strong>Scanning from Remote Computer</strong>
+                                    </div>
+                                    
+                                    <div id="remoteScanningGuide">
+                                        <h6 class="text-primary">Current Setup:</h6>
+                                        <ul class="list-unstyled mb-3">
+                                            <li><i class="bi bi-check-circle text-success"></i> <strong>Server-Side Scanning:</strong> Scanner must be connected to this server</li>
+                                            <li><i class="bi bi-arrow-right text-info"></i> <strong>Remote Access:</strong> You can access this interface from any computer on the network</li>
+                                            <li><i class="bi bi-wifi text-warning"></i> <strong>Network Access:</strong> Available at <code id="serverUrl">http://[SERVER-IP]:5249</code></li>
+                                        </ul>
+
+                                        <h6 class="text-primary">Scanner Connection Options:</h6>
+                                        <div class="accordion accordion-flush" id="remoteOptionsAccordion">
+                                            <div class="accordion-item">
+                                                <h2 class="accordion-header" id="option1Header">
+                                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#option1" aria-expanded="false" aria-controls="option1">
+                                                        <i class="bi bi-usb-symbol me-2"></i> Option 1: Connect Scanner to Server (Recommended)
+                                                    </button>
+                                                </h2>
+                                                <div id="option1" class="accordion-collapse collapse" aria-labelledby="option1Header" data-bs-parent="#remoteOptionsAccordion">
+                                                    <div class="accordion-body">
+                                                        <p><strong>Setup:</strong> Connect your scanner directly to the computer running AgentDMS.</p>
+                                                        <ul class="list-unstyled">
+                                                            <li>✅ Easiest setup</li>
+                                                            <li>✅ Full scanner driver support</li>
+                                                            <li>✅ Works from any remote device</li>
+                                                            <li>✅ No additional software needed</li>
+                                                        </ul>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="accordion-item">
+                                                <h2 class="accordion-header" id="option2Header">
+                                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#option2" aria-expanded="false" aria-controls="option2">
+                                                        <i class="bi bi-ethernet me-2"></i> Option 2: Network Scanner (Future)
+                                                    </button>
+                                                </h2>
+                                                <div id="option2" class="accordion-collapse collapse" aria-labelledby="option2Header" data-bs-parent="#remoteOptionsAccordion">
+                                                    <div class="accordion-body">
+                                                        <p><strong>Status:</strong> 🚧 <em>Planned for future release</em></p>
+                                                        <p>Direct support for network-capable scanners that can be accessed via IP address.</p>
+                                                        <ul class="list-unstyled">
+                                                            <li>🔄 Scanner connects to network directly</li>
+                                                            <li>🔄 No physical connection to server needed</li>
+                                                            <li>🔄 Multiple users can share the scanner</li>
+                                                        </ul>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="mt-3">
+                                            <a href="/REMOTE_SCANNING.md" target="_blank" class="btn btn-outline-primary btn-sm">
+                                                <i class="bi bi-book"></i> View Complete Remote Scanning Guide
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

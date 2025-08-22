@@ -207,4 +207,16 @@ app.MapHub<ProgressHub>("/progressHub").RequireCors("SignalRPolicy");
 // Serve the main HTML page at root
 app.MapGet("/", () => Results.File("index.html", "text/html"));
 
+// Serve the remote scanning documentation
+app.MapGet("/REMOTE_SCANNING.md", () => 
+{
+    var filePath = Path.Combine(Directory.GetCurrentDirectory(), "..", "REMOTE_SCANNING.md");
+    if (File.Exists(filePath))
+    {
+        var content = File.ReadAllText(filePath);
+        return Results.Text(content, "text/markdown");
+    }
+    return Results.NotFound("Remote scanning documentation not found");
+});
+
 app.Run();
