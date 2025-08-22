@@ -62,6 +62,23 @@ AgentDMS can be accessed from other computers on your network. The application i
 
 📖 **For detailed remote access setup and configuration, see [REMOTE_ACCESS.md](REMOTE_ACCESS.md)**
 
+### Remote Scanning
+
+AgentDMS supports scanning from remote computers with multiple setup options:
+
+**Recommended Setup (Server-Side Scanning):**
+- Connect scanner to the computer running AgentDMS
+- Access scanner remotely through the web interface from any device
+- Full scanner driver support with centralized management
+
+**Key Benefits:**
+- ✅ Works from any device with a web browser
+- ✅ No additional software needed on client devices  
+- ✅ Full TWAIN/WIA scanner driver support
+- ✅ Cross-platform compatibility (Windows, Linux, macOS)
+
+📖 **For comprehensive remote scanning guide, troubleshooting, and future network scanner support, see [REMOTE_SCANNING.md](REMOTE_SCANNING.md)**
+
 ### REST API
 
 AgentDMS provides a comprehensive REST API for programmatic access:

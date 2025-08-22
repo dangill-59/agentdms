@@ -1202,6 +1202,9 @@ async function initializeScannerInterface() {
         // Load scanner capabilities
         await loadScannerCapabilities();
         
+        // Update remote scanning guidance
+        updateRemoteScanningGuidance();
+        
         // Bind scanner event handlers
         bindScannerEventHandlers();
         
@@ -1587,4 +1590,58 @@ function handleModalScan() {
     
     // Perform the scan with the configured settings
     performScan(isPreview);
+}
+
+// Update remote scanning guidance with dynamic information
+function updateRemoteScanningGuidance() {
+    try {
+        // Get the current server URL
+        const serverUrlElement = document.getElementById('serverUrl');
+        if (serverUrlElement) {
+            const currentUrl = window.location.protocol + '//' + window.location.host;
+            const serverIpPlaceholder = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+                ? 'http://[SERVER-IP]:5249' 
+                : currentUrl;
+            serverUrlElement.textContent = serverIpPlaceholder;
+            
+            // Add click handler to copy URL
+            serverUrlElement.style.cursor = 'pointer';
+            serverUrlElement.title = 'Click to copy URL';
+            serverUrlElement.onclick = function() {
+                navigator.clipboard.writeText(serverIpPlaceholder).then(() => {
+                    // Show brief feedback
+                    const originalText = serverUrlElement.textContent;
+                    serverUrlElement.textContent = 'Copied!';
+                    setTimeout(() => {
+                        serverUrlElement.textContent = originalText;
+                    }, 1000);
+                }).catch(err => {
+                    console.warn('Could not copy to clipboard:', err);
+                });
+            };
+        }
+        
+        // Update guidance based on detected platform and scanners
+        const guidanceElement = document.getElementById('remoteScanningGuide');
+        if (guidanceElement && availableScanners && platformCapabilities) {
+            // Check if we have real scanners or just mock scanners
+            const hasRealScanners = availableScanners.some(scanner => 
+                scanner.capabilities && scanner.capabilities.Type !== 'Mock'
+            );
+            
+            // Update status indicators based on current setup
+            const setupStatus = guidanceElement.querySelector('.alert-info');
+            if (setupStatus) {
+                if (hasRealScanners) {
+                    setupStatus.className = 'alert alert-success';
+                    setupStatus.innerHTML = '<i class="bi bi-check-circle"></i> <strong>Real Scanner Detected:</strong> Your scanner is ready for remote access!';
+                } else {
+                    setupStatus.className = 'alert alert-info';
+                    setupStatus.innerHTML = '<i class="bi bi-info-circle"></i> <strong>Mock Scanner Mode:</strong> Connect a real scanner to the server for full functionality.';
+                }
+            }
+        }
+    } catch (error) {
+        console.warn('Error updating remote scanning guidance:', error);
+    }
 }

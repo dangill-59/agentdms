@@ -6,10 +6,11 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <!-- Enable Windows targeting conditionally for TWAIN support when available -->
+    <EnableWindowsTargeting Condition="$([MSBuild]::IsOSPlatform('Windows'))">true</EnableWindowsTargeting>
     <!-- Suppress NU1701 warning for NTwain package - it works fine with .NET 8.0 despite targeting .NET Framework -->
     <NoWarn>$(NoWarn);NU1701</NoWarn>
   </PropertyGroup>
