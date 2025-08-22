@@ -574,6 +574,100 @@ public class ImageProcessingController : ControllerBase
             return StatusCode(500, new { error = "Preview scan failed", message = ex.Message });
         }
     }
+
+    /// <summary>
+    /// Get scanner connectivity information for remote access scenarios
+    /// </summary>
+    /// <returns>Information about scanner connectivity requirements and limitations</returns>
+    /// <response code="200">Scanner connectivity information retrieved successfully</response>
+    [HttpGet("scanners/connectivity-info")]
+    [SwaggerOperation(Summary = "Get scanner connectivity information", Description = "Provides information about scanner connectivity requirements, especially for remote access scenarios")]
+    [SwaggerResponse(200, "Scanner connectivity information", typeof(ScannerConnectivityInfo))]
+    [ProducesResponseType(typeof(ScannerConnectivityInfo), StatusCodes.Status200OK)]
+    public async Task<ActionResult<ScannerConnectivityInfo>> GetScannerConnectivityInfo()
+    {
+        try
+        {
+            var availableScanners = await _scannerService.GetAvailableScannersAsync();
+            var capabilities = await _scannerService.GetCapabilitiesAsync();
+            var diagnostics = await _scannerService.GetDiagnosticInfoAsync();
+
+            var connectivityInfo = new ScannerConnectivityInfo
+            {
+                IsRemoteAccess = IsRemoteRequest(),
+                ServerPlatform = capabilities.PlatformInfo,
+                HasRealScanners = availableScanners.Any(s => !s.DeviceId.StartsWith("mock_")),
+                TotalScannersFound = availableScanners.Count,
+                ScannerConnectivityRequirements = GetScannerConnectivityRequirements(),
+                RemoteAccessLimitations = GetRemoteAccessLimitations(),
+                RecommendedSolutions = GetRecommendedSolutions()
+            };
+
+            return Ok(connectivityInfo);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting scanner connectivity information");
+            return StatusCode(500, new { error = "Failed to get connectivity information", message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Determine if this is a remote access request
+    /// </summary>
+    private bool IsRemoteRequest()
+    {
+        var remoteIp = HttpContext.Connection.RemoteIpAddress?.ToString();
+        var isLocal = remoteIp == "127.0.0.1" || remoteIp == "::1" || 
+                     remoteIp?.StartsWith("192.168.") == true || 
+                     remoteIp?.StartsWith("10.") == true ||
+                     remoteIp?.StartsWith("172.") == true;
+        return !isLocal;
+    }
+
+    /// <summary>
+    /// Get scanner connectivity requirements information
+    /// </summary>
+    private List<string> GetScannerConnectivityRequirements()
+    {
+        return new List<string>
+        {
+            "Scanners must be physically connected to the computer running AgentDMS server",
+            "Scanner drivers must be installed on the server machine",
+            "TWAIN-compatible scanners are supported on Windows",
+            "SANE-compatible scanners are supported on Linux",
+            "Wireless or network scanners must be configured on the server machine"
+        };
+    }
+
+    /// <summary>
+    /// Get remote access limitations
+    /// </summary>
+    private List<string> GetRemoteAccessLimitations()
+    {
+        return new List<string>
+        {
+            "Browser security prevents direct access to scanners on remote client machines",
+            "AgentDMS cannot detect scanners connected to your local computer when accessed remotely",
+            "All scanning operations are performed on the server machine",
+            "TWAIN APIs require direct hardware access and cannot work through web browsers"
+        };
+    }
+
+    /// <summary>
+    /// Get recommended solutions for remote scanner access
+    /// </summary>
+    private List<string> GetRecommendedSolutions()
+    {
+        return new List<string>
+        {
+            "Connect scanners directly to the computer running AgentDMS",
+            "Install AgentDMS on the same machine where your scanners are connected",
+            "Use network-enabled scanners that can be configured on the server machine",
+            "Consider using remote desktop software to access the server machine directly",
+            "For development/testing, mock scanners are available and will work from any location"
+        };
+    }
 }
 
 // DTOs for API requests and responses
@@ -717,4 +811,45 @@ public class JobStatusResponse
     /// Error message if job failed
     /// </summary>
     public string? ErrorMessage { get; set; }
+}
+
+/// <summary>
+/// Information about scanner connectivity requirements and limitations
+/// </summary>
+public class ScannerConnectivityInfo
+{
+    /// <summary>
+    /// Whether this request appears to be from a remote machine
+    /// </summary>
+    public bool IsRemoteAccess { get; set; }
+    
+    /// <summary>
+    /// Platform information of the server running AgentDMS
+    /// </summary>
+    public string ServerPlatform { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// Whether real (non-mock) scanners were detected on the server
+    /// </summary>
+    public bool HasRealScanners { get; set; }
+    
+    /// <summary>
+    /// Total number of scanners found (including mock scanners)
+    /// </summary>
+    public int TotalScannersFound { get; set; }
+    
+    /// <summary>
+    /// Requirements for scanner connectivity
+    /// </summary>
+    public List<string> ScannerConnectivityRequirements { get; set; } = new();
+    
+    /// <summary>
+    /// Limitations when accessing from remote machines
+    /// </summary>
+    public List<string> RemoteAccessLimitations { get; set; } = new();
+    
+    /// <summary>
+    /// Recommended solutions for remote scanner access
+    /// </summary>
+    public List<string> RecommendedSolutions { get; set; } = new();
 }

@@ -2,6 +2,10 @@
 
 This document explains how to access AgentDMS from another computer on your network.
 
+## Quick Start
+
+For scanner-specific remote access information, see **[SCANNER_REMOTE_ACCESS.md](SCANNER_REMOTE_ACCESS.md)** for detailed guidance on using scanners when accessing AgentDMS from remote machines.
+
 ## Configuration Changes Made
 
 The application has been configured to allow remote access with the following changes:
@@ -70,6 +74,25 @@ Make sure your firewall allows incoming connections on the ports you're using:
 2. **No Authentication**: The current setup doesn't include authentication - anyone who can reach the server can use the application
 3. **HTTPS Certificates**: For HTTPS access, you may need to configure proper SSL certificates for production use
 4. **Production Deployment**: For production environments, consider implementing proper authentication, authorization, and security measures
+
+## Scanner Remote Access
+
+**Important**: When accessing AgentDMS from a remote machine, scanners must be connected to the computer running the AgentDMS server, not your local machine.
+
+### Scanner Connectivity Requirements
+
+- Scanners must be physically connected to the server machine
+- Scanner drivers must be installed on the server machine  
+- Browser security prevents direct access to scanners on remote client machines
+
+### Solutions for Remote Scanner Access
+
+1. **Connect scanners to the server machine** where AgentDMS is running
+2. **Install AgentDMS locally** on the machine with your scanners
+3. **Use network-enabled scanners** configured on the server machine
+4. **Use remote desktop software** to access the server machine directly
+
+📖 **For detailed scanner remote access guidance, see [SCANNER_REMOTE_ACCESS.md](SCANNER_REMOTE_ACCESS.md)**
 
 ## Troubleshooting
 
