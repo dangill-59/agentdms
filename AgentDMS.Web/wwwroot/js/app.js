@@ -31,6 +31,7 @@ async function initializeSignalR() {
     try {
         progressConnection = new signalR.HubConnectionBuilder()
             .withUrl("/progressHub")
+            .withAutomaticReconnect()
             .build();
 
         progressConnection.on("ProgressUpdate", handleProgressUpdate);
@@ -39,6 +40,24 @@ async function initializeSignalR() {
         console.log("SignalR connection established for real-time progress updates");
     } catch (error) {
         console.error("Error establishing SignalR connection:", error);
+    }
+}
+
+// Helper function to safely invoke SignalR methods
+async function safeSignalRInvoke(methodName, ...args) {
+    try {
+        if (progressConnection && progressConnection.state === signalR.HubConnectionState.Connected) {
+            await progressConnection.invoke(methodName, ...args);
+        } else if (progressConnection && progressConnection.state === signalR.HubConnectionState.Disconnected) {
+            console.log("SignalR disconnected, attempting to reconnect...");
+            await progressConnection.start();
+            await progressConnection.invoke(methodName, ...args);
+        } else {
+            console.log(`SignalR not available (state: ${progressConnection?.state}), skipping ${methodName}`);
+        }
+    } catch (error) {
+        console.warn(`SignalR ${methodName} failed:`, error.message);
+        // Don't throw - allow the main operation to continue
     }
 }
 
@@ -365,8 +384,8 @@ async function handleUpload(event) {
         });
         
         // Join the SignalR group to receive progress updates for this job
-        if (progressConnection && jobId) {
-            await progressConnection.invoke("JoinJob", jobId);
+        if (jobId) {
+            await safeSignalRInvoke("JoinJob", jobId);
         }
         
         // Poll for job completion
@@ -389,8 +408,8 @@ async function handleUpload(event) {
         hideProgress(progressDiv, uploadBtn);
         
         // Leave the SignalR group
-        if (progressConnection && jobId) {
-            await progressConnection.invoke("LeaveJob", jobId);
+        if (jobId) {
+            await safeSignalRInvoke("LeaveJob", jobId);
         }
     }
 }
@@ -443,8 +462,8 @@ async function handleBatchProcess(event) {
         const results = responseData.results;
         
         // Join the SignalR group to receive progress updates for this job
-        if (progressConnection && jobId) {
-            await progressConnection.invoke("JoinJob", jobId);
+        if (jobId) {
+            await safeSignalRInvoke("JoinJob", jobId);
         }
         
         // Calculate rendering time
@@ -465,8 +484,8 @@ async function handleBatchProcess(event) {
         hideProgress(progressDiv, batchBtn);
         
         // Leave the SignalR group
-        if (progressConnection && jobId) {
-            await progressConnection.invoke("LeaveJob", jobId);
+        if (jobId) {
+            await safeSignalRInvoke("LeaveJob", jobId);
         }
     }
 }
