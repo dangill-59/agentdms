@@ -135,10 +135,10 @@ builder.Services.AddCors(options =>
                .AllowAnyHeader();
     });
     
-    // Add specific policy for SignalR
+    // Add specific policy for SignalR - allow all origins for remote access
     options.AddPolicy("SignalRPolicy", builder =>
     {
-        builder.WithOrigins("http://localhost", "https://localhost")
+        builder.SetIsOriginAllowed(_ => true)  // Allow any origin for remote access
                .AllowAnyMethod()
                .AllowAnyHeader()
                .AllowCredentials();
@@ -201,8 +201,8 @@ app.UseStaticFiles(new StaticFileOptions
 app.UseRouting();
 app.MapControllers();
 
-// Map SignalR hub
-app.MapHub<ProgressHub>("/progressHub");
+// Map SignalR hub with specific CORS policy for remote access
+app.MapHub<ProgressHub>("/progressHub").RequireCors("SignalRPolicy");
 
 // Serve the main HTML page at root
 app.MapGet("/", () => Results.File("index.html", "text/html"));

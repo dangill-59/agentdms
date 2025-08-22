@@ -42,6 +42,7 @@ The easiest way to use AgentDMS is through the web interface:
 dotnet run --project AgentDMS.Web
 
 # Open your browser to http://localhost:5249
+# For remote access, see REMOTE_ACCESS.md
 ```
 
 **Web Interface Features:**
@@ -50,6 +51,16 @@ dotnet run --project AgentDMS.Web
 - **Gallery Generation**: Create thumbnail galleries with customizable sizes
 - **Format Support**: View all supported formats with descriptions
 - **Mistral Settings**: Configure Mistral LLM integration for document AI
+
+### Remote Access
+
+AgentDMS can be accessed from other computers on your network. The application is pre-configured to allow remote connections on all network interfaces.
+
+**Quick Start for Remote Access:**
+1. Find your server's IP address (e.g., `192.168.1.100`)
+2. Access from remote computer: `http://[SERVER-IP]:5249`
+
+📖 **For detailed remote access setup and configuration, see [REMOTE_ACCESS.md](REMOTE_ACCESS.md)**
 
 ### REST API
 
