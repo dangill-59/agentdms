@@ -1,0 +1,78 @@
+{
+  "name": "@agentdms/sdk",
+  "version": "1.0.0",
+  "description": "Electron-based image/document viewer and scanner SDK for AgentDMS",
+  "main": "src/index.js",
+  "author": "AgentDMS Team",
+  "license": "MIT",
+  "keywords": [
+    "electron",
+    "image-viewer",
+    "document-scanner",
+    "pdf-viewer",
+    "annotation",
+    "twain",
+    "sane",
+    "sdk"
+  ],
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux",
+    "test": "jest",
+    "lint": "eslint src/"
+  },
+  "jest": {
+    "testEnvironment": "jsdom",
+    "testMatch": [
+      "**/tests/**/*.test.js"
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dangill-59/agentdms.git",
+    "directory": "AgentDMS.SDK"
+  },
+  "files": [
+    "src/",
+    "docs/",
+    "README.md"
+  ],
+  "devDependencies": {
+    "electron": "^37.3.1",
+    "electron-builder": "^26.0.12",
+    "eslint": "^9.33.0",
+    "globals": "^16.3.0",
+    "jest": "^30.0.5",
+    "jest-environment-jsdom": "^30.0.5"
+  },
+  "dependencies": {
+    "axios": "^1.11.0",
+    "fabric": "^6.7.1",
+    "form-data": "^4.0.4",
+    "pdf-lib": "^1.17.1"
+  },
+  "build": {
+    "appId": "com.agentdms.sdk",
+    "productName": "AgentDMS SDK",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "node_modules/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.productivity"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  }
+}
