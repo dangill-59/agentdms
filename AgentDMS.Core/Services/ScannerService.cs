@@ -454,7 +454,8 @@ public class ScannerService : IScannerService, IDisposable
                 {
                     ["Type"] = "Mock",
                     ["MaxResolution"] = 1200,
-                    ["ColorModes"] = new[] { "Color", "Grayscale", "BlackAndWhite" }
+                    ["ColorModes"] = new[] { "Color", "Grayscale", "BlackAndWhite" },
+                    ["RemoteAccessInfo"] = "This is a mock scanner for testing. Real scanners must be connected to the server machine."
                 }
             },
             new ScannerInfo
@@ -469,7 +470,8 @@ public class ScannerService : IScannerService, IDisposable
                 {
                     ["Type"] = "Mock",
                     ["MaxResolution"] = 600,
-                    ["ColorModes"] = new[] { "Color", "Grayscale" }
+                    ["ColorModes"] = new[] { "Color", "Grayscale" },
+                    ["RemoteAccessInfo"] = "This is a mock scanner for testing. Real scanners must be connected to the server machine."
                 }
             }
         };

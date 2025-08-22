@@ -1222,7 +1222,10 @@ async function loadAvailableScanners() {
         
         if (availableScanners.length === 0) {
             scannerSelect.innerHTML = '<option value="">No scanners found</option>';
-            showScannerStatus('No scanners found. This may be a development environment with mock scanners.', 'warning');
+            showScannerStatus('No scanners found. Scanners must be connected to the server machine running AgentDMS.', 'warning');
+            
+            // Load connectivity info to provide better guidance
+            loadScannerConnectivityInfo();
         } else {
             availableScanners.forEach((scanner, index) => {
                 const option = document.createElement('option');
@@ -1236,6 +1239,12 @@ async function loadAvailableScanners() {
             
             // Update scanner info for the selected scanner
             updateScannerInfo();
+            
+            // Check if all scanners are mock scanners for remote access scenario
+            const allMockScanners = availableScanners.every(s => s.deviceId.startsWith('mock_'));
+            if (allMockScanners) {
+                loadScannerConnectivityInfo();
+            }
         }
     } catch (error) {
         console.error('Error loading scanners:', error);
@@ -1253,6 +1262,42 @@ async function loadScannerCapabilities() {
     } catch (error) {
         console.error('Error loading scanner capabilities:', error);
         showScannerStatus('Error loading scanner capabilities: ' + error.message, 'warning');
+    }
+}
+
+async function loadScannerConnectivityInfo() {
+    try {
+        const response = await apiCall('ImageProcessing/scanners/connectivity-info');
+        if (response) {
+            displayScannerConnectivityInfo(response);
+        }
+    } catch (error) {
+        console.error('Error loading scanner connectivity info:', error);
+    }
+}
+
+function displayScannerConnectivityInfo(connectivityInfo) {
+    let message = '';
+    let alertType = 'info';
+    
+    if (connectivityInfo.isRemoteAccess && !connectivityInfo.hasRealScanners) {
+        message = '<strong>Remote Access Detected:</strong><br/>';
+        message += 'You are accessing AgentDMS from a remote machine. ';
+        message += 'Scanners must be connected to the server machine, not your local computer.<br/><br/>';
+        message += '<strong>To use real scanners:</strong><br/>';
+        message += '• Connect scanners to the computer running AgentDMS<br/>';
+        message += '• Install scanner drivers on the server machine<br/>';
+        message += '• Or install AgentDMS on the machine where your scanners are connected';
+        alertType = 'warning';
+    } else if (!connectivityInfo.hasRealScanners) {
+        message = '<strong>Scanner Information:</strong><br/>';
+        message += 'Only mock/test scanners are currently available. ';
+        message += 'For real scanning, connect physical scanners to this machine and install the appropriate drivers.';
+        alertType = 'info';
+    }
+    
+    if (message) {
+        showScannerStatus(message, alertType, false); // Don't auto-hide this important message
     }
 }
 
@@ -1461,13 +1506,27 @@ function showScanResult(result, isPreview) {
     `;
 }
 
-function showScannerStatus(message, type = 'info') {
+function showScannerStatus(message, type = 'info', autoHide = true) {
     const statusDiv = document.getElementById('scannerStatus');
     const statusText = document.getElementById('scannerStatusText');
     
     statusDiv.className = `alert alert-${type}`;
-    statusText.textContent = message;
+    
+    // Support HTML content for rich messaging
+    if (message.includes('<')) {
+        statusText.innerHTML = message;
+    } else {
+        statusText.textContent = message;
+    }
+    
     statusDiv.style.display = 'block';
+    
+    // Auto-hide after 10 seconds if autoHide is true (except for important messages)
+    if (autoHide && !message.includes('Remote Access Detected')) {
+        setTimeout(() => {
+            hideScannerStatus();
+        }, 10000);
+    }
 }
 
 function hideScannerStatus() {
