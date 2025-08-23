@@ -1,11 +1,41 @@
 const axios = require('axios');
 const fs = require('fs');
 const FormData = require('form-data');
+const https = require('https');
 
 class AgentDMSAPI {
-  constructor(baseUrl = 'http://localhost:5249') {
+  constructor(baseUrl = 'http://localhost:5249', options = {}) {
     this.baseUrl = baseUrl;
     this.apiBase = `${baseUrl}/api/ImageProcessing`;
+    this.options = {
+      rejectUnauthorized: options.rejectUnauthorized !== false, // Default to true for security
+      ...options
+    };
+    
+    // Create axios instance with SSL configuration
+    this.axiosInstance = this.createAxiosInstance();
+  }
+
+  /**
+   * Create axios instance with appropriate SSL configuration
+   * @returns {Object} Configured axios instance
+   */
+  createAxiosInstance() {
+    const config = {};
+    
+    // For localhost connections, allow self-signed certificates in development
+    if (this.baseUrl.includes('localhost') || this.baseUrl.includes('127.0.0.1')) {
+      // Check if we're in development mode (Electron dev mode or NODE_ENV)
+      const isDevelopment = process.argv.includes('--dev') || process.env.NODE_ENV === 'development';
+      
+      if (isDevelopment || !this.options.rejectUnauthorized) {
+        config.httpsAgent = new https.Agent({
+          rejectUnauthorized: false
+        });
+      }
+    }
+    
+    return axios.create(config);
   }
 
   /**
@@ -15,6 +45,8 @@ class AgentDMSAPI {
   setBaseUrl(url) {
     this.baseUrl = url;
     this.apiBase = `${url}/api/ImageProcessing`;
+    // Recreate axios instance with new URL
+    this.axiosInstance = this.createAxiosInstance();
   }
 
   /**
@@ -23,7 +55,7 @@ class AgentDMSAPI {
    */
   async getSupportedFormats() {
     try {
-      const response = await axios.get(`${this.apiBase}/formats`);
+      const response = await this.axiosInstance.get(`${this.apiBase}/formats`);
       return response.data;
     } catch (error) {
       console.error('Error getting supported formats:', error);
@@ -37,7 +69,7 @@ class AgentDMSAPI {
    */
   async getAvailableScanners() {
     try {
-      const response = await axios.get(`${this.apiBase}/scanners`);
+      const response = await this.axiosInstance.get(`${this.apiBase}/scanners`);
       return response.data;
     } catch (error) {
       console.error('Error getting scanners:', error);
@@ -51,7 +83,7 @@ class AgentDMSAPI {
    */
   async getScannerCapabilities() {
     try {
-      const response = await axios.get(`${this.apiBase}/scanners/capabilities`);
+      const response = await this.axiosInstance.get(`${this.apiBase}/scanners/capabilities`);
       return response.data;
     } catch (error) {
       console.error('Error getting scanner capabilities:', error);
@@ -81,7 +113,7 @@ class AgentDMSAPI {
         ...options
       };
 
-      const response = await axios.post(`${this.apiBase}/scan`, scanOptions);
+      const response = await this.axiosInstance.post(`${this.apiBase}/scan`, scanOptions);
       return response.data;
     } catch (error) {
       console.error('Error scanning document:', error);
@@ -114,7 +146,7 @@ class AgentDMSAPI {
         form.append('outputFormat', options.outputFormat);
       }
 
-      const response = await axios.post(`${this.apiBase}/upload`, form, {
+      const response = await this.axiosInstance.post(`${this.apiBase}/upload`, form, {
         headers: {
           ...form.getHeaders(),
           'Content-Type': 'multipart/form-data'
@@ -138,7 +170,7 @@ class AgentDMSAPI {
    */
   async processFile(filePath, options = {}) {
     try {
-      const response = await axios.post(`${this.apiBase}/process`, {
+      const response = await this.axiosInstance.post(`${this.apiBase}/process`, {
         filePath: filePath,
         ...options
       });
@@ -156,7 +188,7 @@ class AgentDMSAPI {
    */
   async getJobStatus(jobId) {
     try {
-      const response = await axios.get(`${this.apiBase}/job/${jobId}/status`);
+      const response = await this.axiosInstance.get(`${this.apiBase}/job/${jobId}/status`);
       return response.data;
     } catch (error) {
       console.error('Error getting job status:', error);
@@ -170,7 +202,7 @@ class AgentDMSAPI {
    */
   async checkHealth() {
     try {
-      const response = await axios.get(`${this.baseUrl}/api/apidocumentation/health`);
+      const response = await this.axiosInstance.get(`${this.baseUrl}/api/apidocumentation/health`);
       return response.data;
     } catch (error) {
       console.error('Error checking API health:', error);
