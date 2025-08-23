@@ -92,6 +92,14 @@ function createMenu() {
           click: () => {
             mainWindow.webContents.send('menu-zoom-reset');
           }
+        },
+        { type: 'separator' },
+        {
+          label: 'Toggle Developer Tools',
+          accelerator: process.platform === 'darwin' ? 'Alt+Cmd+I' : 'Ctrl+Shift+I',
+          click: () => {
+            mainWindow.webContents.toggleDevTools();
+          }
         }
       ]
     },
