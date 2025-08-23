@@ -122,22 +122,31 @@ class AgentDMSViewer {
     async loadImage(file) {
         const url = URL.createObjectURL(file);
         
+        // Clear content but preserve drag overlay
+        const existingOverlay = this.container.querySelector('.drag-overlay');
         this.container.innerHTML = `
             <div class="document-viewer">
                 <img class="document-image" src="${url}" alt="Document Image" />
             </div>
         `;
         
+        // Re-add drag overlay if it existed
+        if (existingOverlay) {
+            this.container.appendChild(existingOverlay);
+        }
+        
         const img = this.container.querySelector('.document-image');
         
         return new Promise((resolve, reject) => {
             img.onload = () => {
+                console.log('Image loaded successfully:', file.name);
                 this.resetView();
                 resolve();
             };
-            img.onerror = () => {
+            img.onerror = (e) => {
+                console.error('Image failed to load:', file.name, 'Error:', e);
                 URL.revokeObjectURL(url);
-                reject(new Error('Failed to load image'));
+                reject(new Error(`Failed to load image: ${file.name}`));
             };
         });
     }

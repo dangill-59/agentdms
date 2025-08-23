@@ -183,21 +183,43 @@ class AgentDMSApp {
         try {
             if (window.electronAPI) {
                 // In Electron, use native file dialog
+                console.log('Opening file dialog...');
                 const result = await window.electronAPI.openFile();
+                console.log('File dialog result:', result);
+                
                 if (result && result.filePaths && result.filePaths.length > 0) {
                     // Read file content through main process
                     const filePath = result.filePaths[0];
+                    console.log('Reading file content for:', filePath);
                     const fileContent = await window.electronAPI.readFileContent(filePath);
+                    console.log('File content result:', {
+                        success: fileContent.success,
+                        fileName: fileContent.fileName,
+                        mimeType: fileContent.mimeType,
+                        size: fileContent.size,
+                        dataUrlLength: fileContent.dataUrl ? fileContent.dataUrl.length : 0
+                    });
                     
                     if (fileContent.success) {
                         // Create File object from data URL
+                        console.log('Creating File object from data URL...');
                         const response = await fetch(fileContent.dataUrl);
                         const blob = await response.blob();
                         const file = new File([blob], fileContent.fileName, { type: fileContent.mimeType });
+                        console.log('File object created:', {
+                            name: file.name,
+                            type: file.type,
+                            size: file.size
+                        });
+                        
+                        console.log('Loading file in viewer...');
                         await this.viewer.loadFile(file);
+                        console.log('File loaded in viewer successfully');
                     } else {
                         throw new Error(fileContent.error);
                     }
+                } else {
+                    console.log('File dialog canceled or no file selected');
                 }
             } else {
                 // In browser, use HTML file input
@@ -212,6 +234,7 @@ class AgentDMSApp {
                 input.click();
             }
         } catch (error) {
+            console.error('Error in openFile:', error);
             this.showError('Failed to open file: ' + error.message);
         }
     }
