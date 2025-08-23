@@ -120,35 +120,104 @@ class AgentDMSViewer {
     }
 
     async loadImage(file) {
+        console.log(`Starting loadImage for: ${file.name}, type: ${file.type}, size: ${file.size}`);
+        
+        // Validate file type first
+        const supportedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/bmp', 'image/tiff', 'image/webp'];
+        if (!supportedTypes.includes(file.type)) {
+            throw new Error(`Unsupported image type: ${file.type}. Supported types: ${supportedTypes.join(', ')}`);
+        }
+        
         const url = URL.createObjectURL(file);
+        console.log(`Created object URL: ${url}`);
         
         // Clear content but preserve drag overlay
         const existingOverlay = this.container.querySelector('.drag-overlay');
-        this.container.innerHTML = `
-            <div class="document-viewer">
-                <img class="document-image" src="${url}" alt="Document Image" />
-            </div>
-        `;
+        console.log(`Existing drag overlay found: ${!!existingOverlay}`);
         
-        // Re-add drag overlay if it existed
-        if (existingOverlay) {
-            this.container.appendChild(existingOverlay);
+        // Store original content in case we need to restore it on error
+        const originalContent = this.container.innerHTML;
+        
+        try {
+            this.container.innerHTML = `
+                <div class="document-viewer">
+                    <img class="document-image" src="${url}" alt="Document Image" />
+                </div>
+            `;
+            
+            // Re-add drag overlay if it existed
+            if (existingOverlay) {
+                this.container.appendChild(existingOverlay);
+                console.log('Drag overlay re-added');
+            }
+            
+            const img = this.container.querySelector('.document-image');
+            if (!img) {
+                throw new Error('Failed to create image element');
+            }
+            
+            console.log(`Image element created with src: ${img.src}`);
+            
+            return new Promise((resolve, reject) => {
+                // Set a timeout to catch stuck loading
+                const timeoutId = setTimeout(() => {
+                    console.error('Image loading timed out');
+                    URL.revokeObjectURL(url);
+                    // Restore original content
+                    this.container.innerHTML = originalContent;
+                    if (existingOverlay) {
+                        this.container.appendChild(existingOverlay);
+                    }
+                    reject(new Error(`Image loading timed out for: ${file.name}`));
+                }, 10000); // 10 second timeout
+                
+                img.onload = () => {
+                    clearTimeout(timeoutId);
+                    console.log(`Image loaded successfully: ${file.name}`);
+                    console.log(`Image dimensions: ${img.naturalWidth}x${img.naturalHeight}`);
+                    
+                    // Verify the image actually has content
+                    if (img.naturalWidth === 0 || img.naturalHeight === 0) {
+                        console.error('Image loaded but has no dimensions');
+                        URL.revokeObjectURL(url);
+                        this.container.innerHTML = originalContent;
+                        if (existingOverlay) {
+                            this.container.appendChild(existingOverlay);
+                        }
+                        reject(new Error(`Image appears to be empty or corrupted: ${file.name}`));
+                        return;
+                    }
+                    
+                    this.resetView();
+                    resolve();
+                };
+                
+                img.onerror = (e) => {
+                    clearTimeout(timeoutId);
+                    console.error('Image failed to load:', file.name, 'Error:', e);
+                    console.error('Image src was:', img.src);
+                    URL.revokeObjectURL(url);
+                    
+                    // Restore original content
+                    this.container.innerHTML = originalContent;
+                    if (existingOverlay) {
+                        this.container.appendChild(existingOverlay);
+                    }
+                    
+                    reject(new Error(`Failed to load image: ${file.name}. The file may be corrupted or in an unsupported format.`));
+                };
+            });
+            
+        } catch (error) {
+            console.error('Error setting up image loading:', error);
+            URL.revokeObjectURL(url);
+            // Restore original content
+            this.container.innerHTML = originalContent;
+            if (existingOverlay) {
+                this.container.appendChild(existingOverlay);
+            }
+            throw error;
         }
-        
-        const img = this.container.querySelector('.document-image');
-        
-        return new Promise((resolve, reject) => {
-            img.onload = () => {
-                console.log('Image loaded successfully:', file.name);
-                this.resetView();
-                resolve();
-            };
-            img.onerror = (e) => {
-                console.error('Image failed to load:', file.name, 'Error:', e);
-                URL.revokeObjectURL(url);
-                reject(new Error(`Failed to load image: ${file.name}`));
-            };
-        });
     }
 
     async loadPDF(file) {
