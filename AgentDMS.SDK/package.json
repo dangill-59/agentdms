@@ -51,7 +51,6 @@
   },
   "dependencies": {
     "axios": "^1.11.0",
-    "fabric": "^6.7.1",
     "form-data": "^4.0.4",
     "pdf-lib": "^1.17.1"
   },
@@ -63,16 +62,8 @@
     },
     "files": [
       "src/**/*",
-      "node_modules/**/*",
-      "!node_modules/**/build/**/*",
-      "!node_modules/**/deps/**/*"
+      "node_modules/**/*"
     ],
-    "asarUnpack": [
-      "**/node_modules/canvas/**/*"
-    ],
-    "npmRebuild": false,
-    "nodeGypRebuild": false,
-    "buildDependenciesFromSource": false,
     "mac": {
       "category": "public.app-category.productivity"
     },
