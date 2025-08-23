@@ -2,6 +2,8 @@ const axios = require('axios');
 const fs = require('fs');
 const FormData = require('form-data');
 const https = require('https');
+const path = require('path');
+const os = require('os');
 
 class AgentDMSAPI {
   constructor(baseUrl = 'http://localhost:5249', options = {}) {
@@ -131,12 +133,22 @@ class AgentDMSAPI {
    */
   async uploadFile(filePath, options = {}) {
     try {
-      if (!fs.existsSync(filePath)) {
-        throw new Error(`File not found: ${filePath}`);
+      let actualFilePath = filePath;
+      let tempFilePath = null;
+
+      // Check if filePath is actually a data URL
+      if (typeof filePath === 'string' && filePath.startsWith('data:')) {
+        // Extract data from data URL and create temporary file
+        tempFilePath = await this.createTempFileFromDataUrl(filePath);
+        actualFilePath = tempFilePath;
+      }
+
+      if (!fs.existsSync(actualFilePath)) {
+        throw new Error(`File not found: ${actualFilePath}`);
       }
 
       const form = new FormData();
-      form.append('file', fs.createReadStream(filePath));
+      form.append('file', fs.createReadStream(actualFilePath));
       
       // Add processing options
       if (options.thumbnailSize) {
@@ -146,19 +158,75 @@ class AgentDMSAPI {
         form.append('outputFormat', options.outputFormat);
       }
 
-      const response = await this.axiosInstance.post(`${this.apiBase}/upload`, form, {
-        headers: {
-          ...form.getHeaders(),
-          'Content-Type': 'multipart/form-data'
-        },
-        maxContentLength: Infinity,
-        maxBodyLength: Infinity
-      });
+      try {
+        const response = await this.axiosInstance.post(`${this.apiBase}/upload`, form, {
+          headers: {
+            ...form.getHeaders(),
+            'Content-Type': 'multipart/form-data'
+          },
+          maxContentLength: Infinity,
+          maxBodyLength: Infinity
+        });
 
-      return response.data;
+        return response.data;
+      } finally {
+        // Clean up temporary file if we created one
+        if (tempFilePath && fs.existsSync(tempFilePath)) {
+          try {
+            fs.unlinkSync(tempFilePath);
+          } catch (cleanupError) {
+            console.warn('Failed to cleanup temporary file:', tempFilePath, cleanupError.message);
+          }
+        }
+      }
     } catch (error) {
       console.error('Error uploading file:', error);
       throw new Error(`Failed to upload file: ${error.message}`);
+    }
+  }
+
+  /**
+   * Create a temporary file from a data URL
+   * @param {string} dataUrl - Data URL (e.g., "data:image/png;base64,...")
+   * @returns {Promise<string>} Path to the temporary file
+   */
+  async createTempFileFromDataUrl(dataUrl) {
+    try {
+      // Parse the data URL
+      const matches = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+      if (!matches) {
+        throw new Error('Invalid data URL format');
+      }
+
+      const mimeType = matches[1];
+      const base64Data = matches[2];
+
+      // Determine file extension from MIME type
+      const mimeToExt = {
+        'image/png': '.png',
+        'image/jpeg': '.jpg',
+        'image/jpg': '.jpg',
+        'image/gif': '.gif',
+        'image/bmp': '.bmp',
+        'image/tiff': '.tiff',
+        'image/webp': '.webp',
+        'application/pdf': '.pdf'
+      };
+
+      const extension = mimeToExt[mimeType] || '.bin';
+      
+      // Create temporary file path
+      const tempDir = os.tmpdir();
+      const tempFileName = `agentdms_upload_${Date.now()}_${Math.random().toString(36).substr(2, 9)}${extension}`;
+      const tempFilePath = path.join(tempDir, tempFileName);
+
+      // Convert base64 to buffer and write to file
+      const buffer = Buffer.from(base64Data, 'base64');
+      fs.writeFileSync(tempFilePath, buffer);
+
+      return tempFilePath;
+    } catch (error) {
+      throw new Error(`Failed to create temporary file from data URL: ${error.message}`);
     }
   }
 
