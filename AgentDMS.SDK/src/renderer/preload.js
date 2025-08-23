@@ -16,13 +16,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Menu events
   onMenuAction: (callback) => {
-    ipcRenderer.on('menu-open-file', callback);
-    ipcRenderer.on('menu-scan-document', callback);
-    ipcRenderer.on('menu-zoom-in', callback);
-    ipcRenderer.on('menu-zoom-out', callback);
-    ipcRenderer.on('menu-zoom-reset', callback);
-    ipcRenderer.on('menu-toggle-annotation', callback);
-    ipcRenderer.on('menu-upload', callback);
+    // Set up handlers for each menu action that call the callback with the action name
+    ipcRenderer.on('menu-open-file', () => callback(null, 'menu-open-file'));
+    ipcRenderer.on('menu-scan-document', () => callback(null, 'menu-scan-document'));
+    ipcRenderer.on('menu-zoom-in', () => callback(null, 'menu-zoom-in'));
+    ipcRenderer.on('menu-zoom-out', () => callback(null, 'menu-zoom-out'));
+    ipcRenderer.on('menu-zoom-reset', () => callback(null, 'menu-zoom-reset'));
+    ipcRenderer.on('menu-toggle-annotation', () => callback(null, 'menu-toggle-annotation'));
+    ipcRenderer.on('menu-upload', () => callback(null, 'menu-upload'));
   },
 
   // Remove listeners

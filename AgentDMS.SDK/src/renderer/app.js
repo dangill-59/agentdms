@@ -139,30 +139,43 @@ class AgentDMSApp {
 
     setupElectronMenuHandlers() {
         if (!window.electronAPI) return;
+        
+        console.log('Setting up Electron menu handlers...');
 
         window.electronAPI.onMenuAction((event, action) => {
+            console.log('Menu action received:', action);
+            
             switch (action) {
                 case 'menu-open-file':
+                    console.log('Menu: Open File triggered');
                     this.openFile();
                     break;
                 case 'menu-scan-document':
+                    console.log('Menu: Scan Document triggered');
                     this.showScanDialog();
                     break;
                 case 'menu-zoom-in':
+                    console.log('Menu: Zoom In triggered');
                     this.viewer.zoomIn();
                     break;
                 case 'menu-zoom-out':
+                    console.log('Menu: Zoom Out triggered');
                     this.viewer.zoomOut();
                     break;
                 case 'menu-zoom-reset':
+                    console.log('Menu: Reset Zoom triggered');
                     this.viewer.resetView();
                     break;
                 case 'menu-toggle-annotation':
+                    console.log('Menu: Toggle Annotation triggered');
                     this.toggleAnnotation();
                     break;
                 case 'menu-upload':
+                    console.log('Menu: Upload triggered');
                     this.uploadCurrentFile();
                     break;
+                default:
+                    console.warn('Unknown menu action:', action);
             }
         });
     }
@@ -181,16 +194,20 @@ class AgentDMSApp {
 
     async openFile() {
         try {
+            this.showStatus('Opening file dialog...', 'info');
+            
             if (window.electronAPI) {
                 // In Electron, use native file dialog
                 console.log('Opening file dialog...');
                 const result = await window.electronAPI.openFile();
                 console.log('File dialog result:', result);
                 
-                if (result && result.filePaths && result.filePaths.length > 0) {
+                if (result && !result.canceled && result.filePaths && result.filePaths.length > 0) {
                     // Read file content through main process
                     const filePath = result.filePaths[0];
                     console.log('Reading file content for:', filePath);
+                    this.showStatus('Reading file...', 'info');
+                    
                     const fileContent = await window.electronAPI.readFileContent(filePath);
                     console.log('File content result:', {
                         success: fileContent.success,
@@ -201,6 +218,8 @@ class AgentDMSApp {
                     });
                     
                     if (fileContent.success) {
+                        this.showStatus('Processing file...', 'info');
+                        
                         // Create File object from data URL
                         console.log('Creating File object from data URL...');
                         const response = await fetch(fileContent.dataUrl);
@@ -213,13 +232,19 @@ class AgentDMSApp {
                         });
                         
                         console.log('Loading file in viewer...');
+                        this.showStatus('Loading image...', 'info');
                         await this.viewer.loadFile(file);
                         console.log('File loaded in viewer successfully');
+                        this.showSuccess(`Successfully loaded ${fileContent.fileName}`);
                     } else {
-                        throw new Error(fileContent.error);
+                        throw new Error(fileContent.error || 'Failed to read file content');
                     }
+                } else if (result && result.canceled) {
+                    console.log('File dialog was canceled by user');
+                    this.showStatus('File selection canceled', 'warning', true);
                 } else {
-                    console.log('File dialog canceled or no file selected');
+                    console.log('No file selected or invalid dialog result');
+                    this.showError('No file was selected');
                 }
             } else {
                 // In browser, use HTML file input
@@ -227,8 +252,17 @@ class AgentDMSApp {
                 input.type = 'file';
                 input.accept = '.jpg,.jpeg,.png,.gif,.bmp,.tiff,.pdf,.webp';
                 input.onchange = async (e) => {
-                    if (e.target.files.length > 0) {
-                        await this.viewer.loadFile(e.target.files[0]);
+                    try {
+                        if (e.target.files.length > 0) {
+                            this.showStatus('Loading image...', 'info');
+                            await this.viewer.loadFile(e.target.files[0]);
+                            this.showSuccess(`Successfully loaded ${e.target.files[0].name}`);
+                        } else {
+                            this.showError('No file was selected');
+                        }
+                    } catch (error) {
+                        console.error('Error loading file from input:', error);
+                        this.showError('Failed to load file: ' + error.message);
                     }
                 };
                 input.click();
