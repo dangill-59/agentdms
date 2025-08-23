@@ -1,5 +1,6 @@
 const { app, BrowserWindow, Menu, ipcMain, dialog } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const { AgentDMSAPI } = require('./api/agentdms-api');
 
 // Keep a global reference of the window object
@@ -170,4 +171,51 @@ ipcMain.handle('api-process-file', async (event, filePath, options) => {
 ipcMain.handle('set-api-base-url', async (event, url) => {
   agentDMSAPI.setBaseUrl(url);
   return true;
+});
+
+// File content reading handler
+ipcMain.handle('file:readContent', async (event, filePath) => {
+  try {
+    // Security check - ensure the file exists and is readable
+    if (!fs.existsSync(filePath)) {
+      throw new Error('File does not exist');
+    }
+    
+    // Read file and convert to base64 data URL
+    const fileBuffer = fs.readFileSync(filePath);
+    const fileExtension = path.extname(filePath).toLowerCase();
+    
+    // Determine MIME type based on file extension
+    let mimeType = 'application/octet-stream';
+    const mimeMap = {
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg', 
+      '.png': 'image/png',
+      '.gif': 'image/gif',
+      '.bmp': 'image/bmp',
+      '.tiff': 'image/tiff',
+      '.webp': 'image/webp',
+      '.pdf': 'application/pdf'
+    };
+    
+    if (mimeMap[fileExtension]) {
+      mimeType = mimeMap[fileExtension];
+    }
+    
+    const base64Data = fileBuffer.toString('base64');
+    const dataUrl = `data:${mimeType};base64,${base64Data}`;
+    
+    return {
+      success: true,
+      dataUrl,
+      mimeType,
+      size: fileBuffer.length,
+      fileName: path.basename(filePath)
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message
+    };
+  }
 });

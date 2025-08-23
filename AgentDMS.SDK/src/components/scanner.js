@@ -116,13 +116,19 @@ class AgentDMSScanner {
 
     async loadScannedImage(imagePath) {
         try {
-            // For Electron, we can access the file directly
+            // For Electron, we need to read the file through the main process
             if (window.electronAPI) {
-                // Create a mock File object for the viewer
-                const response = await fetch(`file://${imagePath}`);
-                const blob = await response.blob();
-                const file = new File([blob], imagePath.split('/').pop(), { type: 'image/png' });
-                window.agentDMSApp.viewer.loadFile(file);
+                const fileContent = await window.electronAPI.readFileContent(imagePath);
+                
+                if (fileContent.success) {
+                    // Create File object from data URL
+                    const response = await fetch(fileContent.dataUrl);
+                    const blob = await response.blob();
+                    const file = new File([blob], fileContent.fileName, { type: fileContent.mimeType });
+                    window.agentDMSApp.viewer.loadFile(file);
+                } else {
+                    throw new Error(fileContent.error);
+                }
             }
         } catch (error) {
             console.error('Error loading scanned image:', error);

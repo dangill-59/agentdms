@@ -185,13 +185,19 @@ class AgentDMSApp {
                 // In Electron, use native file dialog
                 const result = await window.electronAPI.openFile();
                 if (result && result.filePaths && result.filePaths.length > 0) {
-                    // Convert file path to File object
+                    // Read file content through main process
                     const filePath = result.filePaths[0];
-                    const response = await fetch(`file://${filePath}`);
-                    const blob = await response.blob();
-                    const fileName = filePath.split('/').pop();
-                    const file = new File([blob], fileName, { type: blob.type });
-                    await this.viewer.loadFile(file);
+                    const fileContent = await window.electronAPI.readFileContent(filePath);
+                    
+                    if (fileContent.success) {
+                        // Create File object from data URL
+                        const response = await fetch(fileContent.dataUrl);
+                        const blob = await response.blob();
+                        const file = new File([blob], fileContent.fileName, { type: fileContent.mimeType });
+                        await this.viewer.loadFile(file);
+                    } else {
+                        throw new Error(fileContent.error);
+                    }
                 }
             } else {
                 // In browser, use HTML file input
