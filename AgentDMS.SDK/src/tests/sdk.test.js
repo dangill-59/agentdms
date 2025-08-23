@@ -24,6 +24,18 @@ describe('AgentDMS API', () => {
         expect(api.apiBase).toBe('http://newserver:3000/api/ImageProcessing');
     });
 
+    test('should create instance with SSL options', () => {
+        const sslApi = new AgentDMSAPI('https://localhost:7249', { rejectUnauthorized: false });
+        expect(sslApi.baseUrl).toBe('https://localhost:7249');
+        expect(sslApi.options.rejectUnauthorized).toBe(false);
+        expect(sslApi.axiosInstance).toBeDefined();
+    });
+
+    test('should create instance with default SSL options', () => {
+        const defaultApi = new AgentDMSAPI('https://localhost:7249');
+        expect(defaultApi.options.rejectUnauthorized).toBe(true);
+    });
+
     test('should throw error for missing scanner name in scan', async () => {
         await expect(api.scanDocument({})).rejects.toThrow();
     });
