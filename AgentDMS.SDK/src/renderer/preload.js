@@ -5,6 +5,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('electronAPI', {
   // File operations
   openFile: () => ipcRenderer.invoke('dialog:openFile'),
+  readFileContent: (filePath) => ipcRenderer.invoke('file:readContent', filePath),
   
   // API calls
   getSupportedFormats: () => ipcRenderer.invoke('api-get-formats'),
