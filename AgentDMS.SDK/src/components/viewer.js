@@ -148,7 +148,9 @@ class AgentDMSViewer {
             // Re-add drag overlay if it existed
             if (existingOverlay) {
                 this.container.appendChild(existingOverlay);
-                console.log('Drag overlay re-added');
+                // Ensure overlay is hidden (not in drag state)
+                existingOverlay.style.display = 'none';
+                console.log('Drag overlay re-added and hidden');
             }
             
             const img = this.container.querySelector('.document-image');
@@ -167,6 +169,8 @@ class AgentDMSViewer {
                     this.container.innerHTML = originalContent;
                     if (existingOverlay) {
                         this.container.appendChild(existingOverlay);
+                        // Ensure overlay is properly hidden in timeout state
+                        this.ensureDragOverlayHidden();
                     }
                     reject(new Error(`Image loading timed out for: ${file.name}`));
                 }, 10000); // 10 second timeout
@@ -183,10 +187,15 @@ class AgentDMSViewer {
                         this.container.innerHTML = originalContent;
                         if (existingOverlay) {
                             this.container.appendChild(existingOverlay);
+                            // Ensure overlay is properly hidden in error state
+                            this.ensureDragOverlayHidden();
                         }
                         reject(new Error(`Image appears to be empty or corrupted: ${file.name}`));
                         return;
                     }
+                    
+                    // Ensure drag overlay is properly hidden after successful load
+                    this.ensureDragOverlayHidden();
                     
                     this.resetView();
                     resolve();
@@ -202,6 +211,8 @@ class AgentDMSViewer {
                     this.container.innerHTML = originalContent;
                     if (existingOverlay) {
                         this.container.appendChild(existingOverlay);
+                        // Ensure overlay is properly hidden in error state
+                        this.ensureDragOverlayHidden();
                     }
                     
                     reject(new Error(`Failed to load image: ${file.name}. The file may be corrupted or in an unsupported format.`));
@@ -215,6 +226,8 @@ class AgentDMSViewer {
             this.container.innerHTML = originalContent;
             if (existingOverlay) {
                 this.container.appendChild(existingOverlay);
+                // Ensure overlay is properly hidden in error state
+                this.ensureDragOverlayHidden();
             }
             throw error;
         }
@@ -403,6 +416,21 @@ class AgentDMSViewer {
 
     getRotation() {
         return this.currentRotation;
+    }
+
+    /**
+     * Ensures the drag overlay is properly hidden after image load
+     * This fixes the issue where the overlay might remain visible and cover the image
+     */
+    ensureDragOverlayHidden() {
+        const overlay = this.container.querySelector('.drag-overlay');
+        if (overlay) {
+            // Force hide the overlay
+            overlay.style.display = 'none';
+            // Remove drag-over class from container to ensure proper state
+            this.container.classList.remove('drag-over');
+            console.log('Drag overlay explicitly hidden after image load');
+        }
     }
 }
 
