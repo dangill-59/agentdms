@@ -426,8 +426,10 @@ npm run build:linux   # Linux
 
 ### Testing
 
+The SDK includes comprehensive testing and validation capabilities:
+
 ```bash
-# Run all tests
+# Run all unit tests
 npm test
 
 # Run specific test suites
@@ -435,7 +437,33 @@ npm test -- --grep "viewer"
 npm test -- --grep "scanner"
 npm test -- --grep "annotator"
 npm test -- --grep "uploader"
+
+# Run end-to-end validation (tests complete Electron app)
+npm run validate:e2e
+
+# Run all validations (E2E + component validation)
+npm run validate
+
+# Run individual component validation
+node validate-image-loading.js
 ```
+
+#### End-to-End Validation
+
+The `validate:e2e` command provides comprehensive testing of the complete Electron application:
+
+- ✅ **Electron App Launch** - Verifies app starts successfully  
+- ✅ **Window Creation** - Confirms main window creation
+- ✅ **Page Loading** - Ensures renderer process loads properly
+- ✅ **IPC Communication** - Tests file reading via IPC handlers
+- ✅ **Image Rendering** - Validates image loading in viewer component
+- ✅ **DOM Validation** - Confirms image elements exist in DOM
+- ✅ **Visual Verification** - Checks that images are actually visible
+- ✅ **Functionality Testing** - Tests zoom, pan, and viewer features
+
+This validation runs the actual Electron app and confirms that images are properly rendered and visible in the DOM, providing confidence that the complete user experience works correctly.
+
+For detailed information about the validation process, see [E2E_VALIDATION_GUIDE.md](./E2E_VALIDATION_GUIDE.md).
 
 ## Contributing
 
