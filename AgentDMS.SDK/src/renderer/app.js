@@ -222,20 +222,56 @@ class AgentDMSApp {
                         
                         // Create File object from data URL
                         console.log('Creating File object from data URL...');
-                        const response = await fetch(fileContent.dataUrl);
-                        const blob = await response.blob();
-                        const file = new File([blob], fileContent.fileName, { type: fileContent.mimeType });
-                        console.log('File object created:', {
-                            name: file.name,
-                            type: file.type,
-                            size: file.size
-                        });
+                        console.log('Data URL length:', fileContent.dataUrl.length);
+                        console.log('Data URL prefix:', fileContent.dataUrl.substring(0, 100));
                         
-                        console.log('Loading file in viewer...');
-                        this.showStatus('Loading image...', 'info');
-                        await this.viewer.loadFile(file);
-                        console.log('File loaded in viewer successfully');
-                        this.showSuccess(`Successfully loaded ${fileContent.fileName}`);
+                        try {
+                            const response = await fetch(fileContent.dataUrl);
+                            console.log('Fetch response status:', response.status, response.statusText);
+                            
+                            const blob = await response.blob();
+                            console.log('Blob created:', {
+                                size: blob.size,
+                                type: blob.type
+                            });
+                            
+                            const file = new File([blob], fileContent.fileName, { type: fileContent.mimeType });
+                            console.log('File object created:', {
+                                name: file.name,
+                                type: file.type,
+                                size: file.size,
+                                lastModified: file.lastModified
+                            });
+                            
+                            // Validate File object
+                            if (file.size === 0) {
+                                throw new Error('Created file object has zero size');
+                            }
+                            if (!file.type) {
+                                console.warn('File object has no MIME type, setting from fileContent');
+                                // Create a new File object with explicit type
+                                const correctedFile = new File([blob], fileContent.fileName, { 
+                                    type: fileContent.mimeType,
+                                    lastModified: Date.now()
+                                });
+                                console.log('Corrected file object:', {
+                                    name: correctedFile.name,
+                                    type: correctedFile.type,
+                                    size: correctedFile.size
+                                });
+                                file = correctedFile;
+                            }
+                            
+                            console.log('Loading file in viewer...');
+                            this.showStatus('Loading image...', 'info');
+                            await this.viewer.loadFile(file);
+                            console.log('File loaded in viewer successfully');
+                            this.showSuccess(`Successfully loaded ${fileContent.fileName}`);
+                            
+                        } catch (fileCreationError) {
+                            console.error('Error during File object creation:', fileCreationError);
+                            throw new Error(`Failed to create File object: ${fileCreationError.message}`);
+                        }
                     } else {
                         throw new Error(fileContent.error || 'Failed to read file content');
                     }
