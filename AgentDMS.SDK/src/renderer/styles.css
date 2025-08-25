@@ -35,6 +35,7 @@ body {
     overflow: auto;
     position: relative;
     height: 100%;
+    min-height: 100%;
 }
 
 .viewer-container.has-content {
@@ -46,10 +47,12 @@ body {
 .document-viewer {
     width: 100%;
     height: 100%;
+    min-height: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
     position: relative;
+    z-index: 10; /* Ensure content appears above drag overlay */
 }
 
 .document-image {
@@ -58,6 +61,8 @@ body {
     object-fit: contain;
     transition: transform 0.2s ease;
     cursor: grab;
+    z-index: 20; /* Ensure image appears above all overlays */
+    position: relative;
 }
 
 .document-image:active {
@@ -225,10 +230,6 @@ body {
     background-color: #f8f9ff;
 }
 
-.viewer-container.drag-over .drag-overlay {
-    display: flex;
-}
-
 .drag-overlay {
     position: absolute;
     top: 0;
@@ -239,7 +240,14 @@ body {
     display: none;
     align-items: center;
     justify-content: center;
-    z-index: 100;
+    z-index: 5; /* Lower z-index so content appears above */
+    pointer-events: none; /* Prevent interference when hidden */
+}
+
+/* Show drag overlay only during drag operations */
+.viewer-container.drag-over .drag-overlay {
+    display: flex;
+    pointer-events: auto; /* Re-enable interaction during drag */
 }
 
 .drag-message {
