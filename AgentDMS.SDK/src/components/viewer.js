@@ -92,28 +92,76 @@ class AgentDMSViewer {
     }
 
     async loadFile(file) {
+        console.log(`=== Starting loadFile for: ${file.name} ===`);
         try {
             this.showStatus('Loading file...', 'info');
             this.currentFile = file;
+            console.log('File assigned to currentFile property');
             
             const fileType = this.getFileType(file);
+            console.log('Detected file type:', fileType);
             
             switch (fileType) {
                 case 'image':
+                    console.log('Calling loadImage method...');
                     await this.loadImage(file);
+                    console.log('loadImage method completed successfully');
                     break;
                 case 'pdf':
+                    console.log('Calling loadPDF method...');
                     await this.loadPDF(file);
+                    console.log('loadPDF method completed successfully');
                     break;
                 default:
                     throw new Error(`Unsupported file type: ${file.type}`);
             }
             
+            console.log('File loading completed, updating file info...');
             this.updateFileInfo(file);
+            console.log('File info updated');
+            
+            console.log('Setting success status...');
             this.showStatus('File loaded successfully', 'success');
+            console.log('Success status set');
+            
+            console.log('Adding has-content class to container...');
             this.container.classList.add('has-content');
+            console.log('Container classes after adding has-content:', this.container.className);
+            
+            // Verify the image is actually visible
+            const img = this.container.querySelector('.document-image');
+            if (img) {
+                console.log('Image element verification:', {
+                    src: img.src,
+                    complete: img.complete,
+                    naturalWidth: img.naturalWidth,
+                    naturalHeight: img.naturalHeight,
+                    offsetWidth: img.offsetWidth,
+                    offsetHeight: img.offsetHeight,
+                    style: img.style.cssText,
+                    visible: img.offsetWidth > 0 && img.offsetHeight > 0
+                });
+                
+                // Additional visibility check
+                const computedStyle = window.getComputedStyle ? window.getComputedStyle(img) : {};
+                console.log('Image computed style check:', {
+                    display: computedStyle.display || 'unknown',
+                    visibility: computedStyle.visibility || 'unknown',
+                    opacity: computedStyle.opacity || 'unknown'
+                });
+                
+                if (img.offsetWidth === 0 || img.offsetHeight === 0) {
+                    console.warn('⚠️ Image loaded but has zero dimensions - possible CSS/container issue');
+                }
+            } else {
+                console.error('❌ No image element found after successful load - serious DOM issue');
+            }
+            
+            console.log('=== loadFile completed successfully ===');
             
         } catch (error) {
+            console.error('❌ Error in loadFile:', error);
+            console.error('Error stack:', error.stack);
             this.showStatus(`Error loading file: ${error.message}`, 'error');
             console.error('Error loading file:', error);
         }
@@ -128,8 +176,22 @@ class AgentDMSViewer {
             throw new Error(`Unsupported image type: ${file.type}. Supported types: ${supportedTypes.join(', ')}`);
         }
         
-        const url = URL.createObjectURL(file);
-        console.log(`Created object URL: ${url}`);
+        console.log('File type validation passed');
+        
+        let url;
+        try {
+            url = URL.createObjectURL(file);
+            console.log(`Created object URL: ${url}`);
+            
+            // Validate object URL
+            if (!url || url === 'null' || url === 'undefined') {
+                throw new Error('Failed to create valid object URL');
+            }
+            
+        } catch (urlError) {
+            console.error('Error creating object URL:', urlError);
+            throw new Error(`Failed to create object URL: ${urlError.message}`);
+        }
         
         // Clear content but preserve drag overlay
         const existingOverlay = this.container.querySelector('.drag-overlay');
@@ -137,13 +199,28 @@ class AgentDMSViewer {
         
         // Store original content in case we need to restore it on error
         const originalContent = this.container.innerHTML;
+        console.log('Original container content length:', originalContent.length);
         
         try {
+            console.log('Creating image element with object URL...');
+            const img = document.createElement('img');
+            img.className = 'document-image';
+            img.alt = 'Document Image';
+            
+            console.log('Image element created, setting up container...');
             this.container.innerHTML = `
                 <div class="document-viewer">
-                    <img class="document-image" src="${url}" alt="Document Image" />
                 </div>
             `;
+            
+            const documentViewer = this.container.querySelector('.document-viewer');
+            if (!documentViewer) {
+                throw new Error('Failed to create document-viewer container');
+            }
+            
+            // Append the image element to the container
+            documentViewer.appendChild(img);
+            console.log('Image element appended to document-viewer');
             
             // Re-add drag overlay if it existed
             if (existingOverlay) {
@@ -155,32 +232,32 @@ class AgentDMSViewer {
                 console.log('Drag overlay re-added and hidden');
             }
             
-            const img = this.container.querySelector('.document-image');
-            if (!img) {
-                throw new Error('Failed to create image element');
-            }
-            
-            console.log(`Image element created with src: ${img.src}`);
+            console.log('Setting up image load handlers and src...');
+            console.log('Image element properties before src:', {
+                className: img.className,
+                alt: img.alt,
+                src: img.src,
+                complete: img.complete,
+                parentElement: !!img.parentElement
+            });
             
             return new Promise((resolve, reject) => {
-                // Set a timeout to catch stuck loading
-                const timeoutId = setTimeout(() => {
-                    console.error('Image loading timed out');
-                    URL.revokeObjectURL(url);
-                    // Restore original content
-                    this.container.innerHTML = originalContent;
-                    if (existingOverlay) {
-                        this.container.appendChild(existingOverlay);
-                        // Ensure overlay is properly hidden in timeout state
-                        this.ensureDragOverlayHidden();
-                    }
-                    reject(new Error(`Image loading timed out for: ${file.name}`));
-                }, 10000); // 10 second timeout
+                console.log('Setting up image load Promise handlers...');
                 
+                // Set up event handlers BEFORE setting src
                 img.onload = () => {
                     clearTimeout(timeoutId);
                     console.log(`Image loaded successfully: ${file.name}`);
                     console.log(`Image dimensions: ${img.naturalWidth}x${img.naturalHeight}`);
+                    console.log('Image final state:', {
+                        src: img.src,
+                        complete: img.complete,
+                        naturalWidth: img.naturalWidth,
+                        naturalHeight: img.naturalHeight,
+                        offsetWidth: img.offsetWidth,
+                        offsetHeight: img.offsetHeight,
+                        visible: img.offsetWidth > 0 && img.offsetHeight > 0
+                    });
                     
                     // Verify the image actually has content
                     if (img.naturalWidth === 0 || img.naturalHeight === 0) {
@@ -199,7 +276,16 @@ class AgentDMSViewer {
                     // Ensure drag overlay is properly hidden after successful load
                     this.ensureDragOverlayHidden();
                     
+                    // Final container state check
+                    console.log('Final container state:', {
+                        hasContent: this.container.classList.contains('has-content'),
+                        innerHTML: this.container.innerHTML.length,
+                        querySelector: !!this.container.querySelector('.document-image'),
+                        imageVisible: img.offsetWidth > 0 && img.offsetHeight > 0
+                    });
+                    
                     this.resetView();
+                    console.log('Image loading Promise resolving...');
                     resolve();
                 };
                 
@@ -207,6 +293,14 @@ class AgentDMSViewer {
                     clearTimeout(timeoutId);
                     console.error('Image failed to load:', file.name, 'Error:', e);
                     console.error('Image src was:', img.src);
+                    console.error('Image state at error:', {
+                        src: img.src,
+                        complete: img.complete,
+                        naturalWidth: img.naturalWidth,
+                        naturalHeight: img.naturalHeight,
+                        offsetWidth: img.offsetWidth,
+                        offsetHeight: img.offsetHeight
+                    });
                     URL.revokeObjectURL(url);
                     
                     // Restore original content
@@ -219,6 +313,42 @@ class AgentDMSViewer {
                     
                     reject(new Error(`Failed to load image: ${file.name}. The file may be corrupted or in an unsupported format.`));
                 };
+                
+                // Check if image is already loaded (cached) BEFORE setting src
+                if (img.complete && img.naturalWidth > 0) {
+                    console.log('Image was already loaded/cached');
+                    this.ensureDragOverlayHidden();
+                    this.resetView();
+                    resolve();
+                    return;
+                }
+                
+                // Set a timeout to catch stuck loading
+                const timeoutId = setTimeout(() => {
+                    console.error('Image loading timed out after 10 seconds');
+                    console.error('Image state at timeout:', {
+                        src: img.src,
+                        complete: img.complete,
+                        naturalWidth: img.naturalWidth,
+                        naturalHeight: img.naturalHeight,
+                        offsetWidth: img.offsetWidth,
+                        offsetHeight: img.offsetHeight
+                    });
+                    URL.revokeObjectURL(url);
+                    // Restore original content
+                    this.container.innerHTML = originalContent;
+                    if (existingOverlay) {
+                        this.container.appendChild(existingOverlay);
+                        // Ensure overlay is properly hidden in timeout state
+                        this.ensureDragOverlayHidden();
+                    }
+                    reject(new Error(`Image loading timed out for: ${file.name}`));
+                }, 10000); // 10 second timeout
+                
+                // Set src AFTER handlers are configured
+                console.log('Setting image src to trigger loading...');
+                img.src = url;
+                console.log('Image src set, waiting for load event...');
             });
             
         } catch (error) {
