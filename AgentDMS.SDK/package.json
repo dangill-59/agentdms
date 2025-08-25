@@ -23,7 +23,9 @@
     "build:mac": "electron-builder --mac",
     "build:linux": "electron-builder --linux",
     "test": "jest",
-    "lint": "eslint src/"
+    "lint": "eslint src/",
+    "validate:e2e": "node validate-electron-viewer-e2e.js",
+    "validate": "npm run validate:e2e && node validate-image-loading.js"
   },
   "jest": {
     "testEnvironment": "jsdom",
