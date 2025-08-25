@@ -150,6 +150,8 @@ class AgentDMSViewer {
                 this.container.appendChild(existingOverlay);
                 // Ensure overlay is hidden (not in drag state)
                 existingOverlay.style.display = 'none';
+                // Remove drag-over class to prevent blue background
+                this.container.classList.remove('drag-over');
                 console.log('Drag overlay re-added and hidden');
             }
             
