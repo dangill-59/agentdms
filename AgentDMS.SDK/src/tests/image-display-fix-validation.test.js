@@ -146,7 +146,7 @@ describe('Image Display Fix Validation', () => {
     // Simulate error cases: timeout, load error, catch block
     const errorScenarios = ['timeout', 'loadError', 'catchBlock'];
     
-    errorScenarios.forEach(scenario => {
+    errorScenarios.forEach(() => {
       // Each error case should call ensureDragOverlayHidden
       const overlay = mockContainer.querySelector('.drag-overlay');
       if (overlay) {
