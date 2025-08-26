@@ -13,7 +13,7 @@ public class FileUploadService
     private readonly string _uploadDirectory;
     private readonly long _maxFileSize;
     
-    public FileUploadService(string? uploadDirectory = null, long maxFileSize = 50 * 1024 * 1024) // 50MB default
+    public FileUploadService(string? uploadDirectory = null, long maxFileSize = 100 * 1024 * 1024) // 100MB default
     {
         _uploadDirectory = uploadDirectory ?? Path.Combine(Path.GetTempPath(), "AgentDMS_Uploads");
         _maxFileSize = maxFileSize;

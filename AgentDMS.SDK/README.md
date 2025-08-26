@@ -192,7 +192,7 @@ Handles file uploads to configurable backends.
 const uploader = AgentDMS.createUploader({
     apiBaseUrl: 'http://localhost:5249',     // AgentDMS server URL
     uploadEndpoint: null,                     // Custom upload endpoint (optional)
-    maxFileSize: 50 * 1024 * 1024,          // 50MB max file size
+    maxFileSize: 100 * 1024 * 1024,          // 100MB max file size
     supportedFormats: ['.jpg', '.png', ...], // Supported file formats
     showProgress: true,                       // Show upload progress
     autoProcess: true,                        // Auto-process after upload
@@ -278,7 +278,7 @@ if (window.electronAPI) {
 const config = {
     apiBaseUrl: 'http://localhost:5249',  // AgentDMS server URL
     uploadEndpoint: null,                  // Custom upload endpoint
-    maxFileSize: 50 * 1024 * 1024,       // Maximum file size
+    maxFileSize: 100 * 1024 * 1024,       // Maximum file size
     autoProcess: true,                     // Auto-process uploads
     showProgress: true                     // Show progress dialogs
 };

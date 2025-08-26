@@ -7,7 +7,7 @@ class AgentDMSUploader {
         this.options = {
             apiBaseUrl: 'http://localhost:5249',
             uploadEndpoint: null, // Will use apiBaseUrl + '/api/ImageProcessing/upload' if not specified
-            maxFileSize: 50 * 1024 * 1024, // 50MB default
+            maxFileSize: 100 * 1024 * 1024, // 100MB default
             supportedFormats: ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.pdf', '.webp'],
             showProgress: true,
             autoProcess: true,
