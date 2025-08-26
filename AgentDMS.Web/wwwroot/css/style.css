@@ -284,6 +284,27 @@ header h1 i {
     background-color: #f8f9fa;
 }
 
+/* AgentDMS SDK Viewer Container styles */
+.viewer-container {
+    background-color: #ffffff;
+    border: 2px dashed #dee2e6;
+    border-radius: 8px;
+    overflow: auto;
+    position: relative;
+    height: 100%;
+    min-height: 400px;
+}
+
+.viewer-container.has-content {
+    border: 1px solid #dee2e6;
+    border-style: solid;
+}
+
+.viewer-container.drag-over {
+    border-color: #007bff;
+    background-color: #f8f9ff;
+}
+
 .image-zoom-control {
     padding: 10px;
     background-color: #f8f9fa;
