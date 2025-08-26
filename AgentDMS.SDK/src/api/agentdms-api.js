@@ -105,17 +105,43 @@ class AgentDMSAPI {
    */
   async scanDocument(options = {}) {
     try {
-      const scanOptions = {
-        scannerName: options.scannerName || '',
-        resolution: options.resolution || 300,
-        colorMode: options.colorMode || 'Color',
-        paperSize: options.paperSize || 'A4',
+      // Map color mode string to enum value
+      let colorModeValue = 2; // Default to Color
+      if (options.colorMode) {
+        switch (options.colorMode.toLowerCase()) {
+          case 'blackandwhite':
+          case 'black-and-white':
+          case 'bw':
+            colorModeValue = 0;
+            break;
+          case 'grayscale':
+          case 'gray':
+            colorModeValue = 1;
+            break;
+          case 'color':
+          default:
+            colorModeValue = 2;
+            break;
+        }
+      }
+
+      // Map format - default to PNG if not specified
+      let formatValue = 0; // PNG default
+      if (options.format !== undefined) {
+        formatValue = parseInt(options.format) || 0;
+      }
+
+      // Map fields to match ScanRequest.cs model
+      const scanRequest = {
+        scannerDeviceId: options.scannerName || options.scannerDeviceId || '',
+        resolution: parseInt(options.resolution) || 300,
+        colorMode: colorModeValue,
+        format: formatValue,
         showUserInterface: options.showUserInterface || false,
-        duplex: options.duplex || false,
-        ...options
+        autoProcess: options.autoProcess !== undefined ? options.autoProcess : true
       };
 
-      const response = await this.axiosInstance.post(`${this.apiBase}/scan`, scanOptions);
+      const response = await this.axiosInstance.post(`${this.apiBase}/scan`, scanRequest);
       return response.data;
     } catch (error) {
       console.error('Error scanning document:', error);
