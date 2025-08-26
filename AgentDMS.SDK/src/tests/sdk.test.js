@@ -93,9 +93,9 @@ describe('AgentDMS Scanner', () => {
 
 describe('AgentDMS Uploader', () => {
     test('should validate file size', () => {
-        const maxFileSize = 50 * 1024 * 1024; // 50MB
-        const validFileSize = 10 * 1024 * 1024; // 10MB
-        const invalidFileSize = 100 * 1024 * 1024; // 100MB
+        const maxFileSize = 100 * 1024 * 1024; // 100MB
+        const validFileSize = 50 * 1024 * 1024; // 50MB
+        const invalidFileSize = 150 * 1024 * 1024; // 150MB
 
         expect(validFileSize).toBeLessThan(maxFileSize);
         expect(invalidFileSize).toBeGreaterThan(maxFileSize);
@@ -123,19 +123,19 @@ describe('Configuration', () => {
     test('should merge configuration options', () => {
         const defaultConfig = {
             apiBaseUrl: 'http://localhost:5249',
-            maxFileSize: 50 * 1024 * 1024,
+            maxFileSize: 100 * 1024 * 1024,
             showProgress: true
         };
 
         const userConfig = {
             apiBaseUrl: 'http://myserver:8080',
-            maxFileSize: 100 * 1024 * 1024
+            maxFileSize: 200 * 1024 * 1024
         };
 
         const mergedConfig = { ...defaultConfig, ...userConfig };
 
         expect(mergedConfig.apiBaseUrl).toBe('http://myserver:8080');
-        expect(mergedConfig.maxFileSize).toBe(100 * 1024 * 1024);
+        expect(mergedConfig.maxFileSize).toBe(200 * 1024 * 1024);
         expect(mergedConfig.showProgress).toBe(true); // Should keep default
     });
 });
