@@ -110,6 +110,75 @@ AgentDMS provides a comprehensive REST API for programmatic access:
 - `POST /api/mistralconfig` - Update configuration
 - `POST /api/mistralconfig/test` - Test configuration
 
+**Upload Configuration:**
+- `GET /api/uploadconfig` - Get current upload configuration
+- `POST /api/uploadconfig` - Update upload configuration
+- `POST /api/uploadconfig/reset` - Reset upload configuration to defaults
+- `GET /api/uploadconfig/info` - Get detailed upload configuration information
+
+**Example API Usage:**
+
+```bash
+# Get supported formats
+curl -X GET "http://localhost:5249/api/imageprocessing/formats"
+
+# Upload and process an image
+curl -X POST "http://localhost:5249/api/imageprocessing/upload" \
+  -H "Content-Type: multipart/form-data" \
+  -F "file=@path/to/image.jpg"
+
+# Check job status
+curl -X GET "http://localhost:5249/api/imageprocessing/job/{jobId}/status"
+
+# Get current upload configuration
+curl -X GET "http://localhost:5249/api/uploadconfig"
+
+# Update upload limits to 200MB
+curl -X POST "http://localhost:5249/api/uploadconfig" \
+  -H "Content-Type: application/json" \
+  -d '{"maxFileSizeBytes": 209715200, "maxRequestBodySizeBytes": 209715200, "maxMultipartBodyLengthBytes": 209715200, "applySizeLimits": true}'
+
+# Get API information
+curl -X GET "http://localhost:5249/api/apidocumentation/info"
+```
+
+## Configuration
+
+### Upload Size Limits
+
+AgentDMS allows you to configure upload size limits both at startup and at runtime:
+
+**Configuration File (appsettings.json):**
+```json
+{
+  "UploadLimits": {
+    "MaxFileSizeBytes": 104857600,
+    "MaxRequestBodySizeBytes": 104857600,
+    "MaxMultipartBodyLengthBytes": 104857600,
+    "ApplySizeLimits": true
+  }
+}
+```
+
+**Environment Variables:**
+```bash
+# Set maximum file size (in MB)
+export AGENTDMS_MAX_FILE_SIZE_MB=200
+
+# Set maximum request body size (in MB)  
+export AGENTDMS_MAX_REQUEST_SIZE_MB=200
+```
+
+**Runtime Configuration via API:**
+- Use the `/api/uploadconfig` endpoints to modify limits while the server is running
+- Configuration changes are saved to `App_Data/uploadconfig.json`
+- No server restart required for most changes
+
+**Configuration Priority:**
+1. Runtime configuration file (`App_Data/uploadconfig.json`)
+2. Environment variables
+3. appsettings.json defaults
+
 **Example API Usage:**
 
 ```bash
