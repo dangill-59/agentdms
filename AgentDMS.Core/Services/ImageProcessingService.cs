@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Text;
 using System.Threading.Tasks;
 using System.Threading;
 using SixLabors.ImageSharp;
@@ -512,48 +513,116 @@ public class ImageProcessingService
     }
 
     /// <summary>
-    /// Extracts text from processed document for AI analysis
+    /// Extracts text from processed document for AI analysis using OCR
     /// </summary>
     /// <param name="processingResult">The processing result containing processed images</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Extracted text content</returns>
     private async Task<string> ExtractTextFromDocumentAsync(ProcessingResult processingResult, CancellationToken cancellationToken)
     {
-        // TODO: Implement OCR text extraction
-        // This is a placeholder implementation. In a production system, you would:
-        // 
-        // 1. Use an OCR library like Tesseract.NET:
-        //    using var engine = new TesseractEngine(@"./tessdata", "eng", EngineMode.Default);
-        //    using var img = Pix.LoadFromFile(imagePath);
-        //    using var page = engine.Process(img);
-        //    return page.GetText();
-        //
-        // 2. For PDFs, extract text directly using iTextSharp or PdfPig:
-        //    using var reader = new PdfReader(pdfPath);
-        //    var text = new StringBuilder();
-        //    for (int page = 1; page <= reader.NumberOfPages; page++)
-        //    {
-        //        text.Append(PdfTextExtractor.GetTextFromPage(reader, page));
-        //    }
-        //    return text.ToString();
-        //
-        // 3. Combine text from multiple pages for multi-page documents
-        // 4. Clean and normalize the extracted text
-        
-        // For now, return a placeholder that indicates text extraction is needed
-        await Task.Delay(1, cancellationToken); // Simulate async operation
-        
-        if (processingResult.ProcessedImage != null)
+        try
         {
-            // Return a sample text for testing purposes
-            // In production, this would be replaced with actual OCR
-            var extension = processingResult.ProcessedImage.OriginalFormat?.ToLowerInvariant();
-            return $"[OCR_PLACEHOLDER] Document type: {extension}, File: {processingResult.ProcessedImage.FileName}. " +
-                   $"This is placeholder text that would be replaced with actual OCR extraction. " +
-                   $"Document appears to be a {extension} file with {processingResult.ProcessedImage.PageCount} page(s).";
+            var extractedText = new StringBuilder();
+
+            // Process single image or main image
+            if (processingResult.ProcessedImage?.ConvertedPngPath != null)
+            {
+                var imageText = await ExtractTextFromImageAsync(processingResult.ProcessedImage.ConvertedPngPath, cancellationToken);
+                if (!string.IsNullOrWhiteSpace(imageText))
+                {
+                    extractedText.AppendLine(imageText);
+                }
+            }
+
+            // Process split pages for multi-page documents
+            if (processingResult.SplitPages != null && processingResult.SplitPages.Count > 0)
+            {
+                foreach (var page in processingResult.SplitPages)
+                {
+                    if (page.ConvertedPngPath != null)
+                    {
+                        var pageText = await ExtractTextFromImageAsync(page.ConvertedPngPath, cancellationToken);
+                        if (!string.IsNullOrWhiteSpace(pageText))
+                        {
+                            extractedText.AppendLine($"--- Page {page.FileName} ---");
+                            extractedText.AppendLine(pageText);
+                        }
+                    }
+                }
+            }
+
+            var result = extractedText.ToString().Trim();
+            
+            // Return a meaningful message if no text was extracted
+            if (string.IsNullOrWhiteSpace(result))
+            {
+                var fileName = processingResult.ProcessedImage?.FileName ?? "Unknown";
+                var extension = processingResult.ProcessedImage?.OriginalFormat?.ToLowerInvariant() ?? "unknown";
+                return $"No text was extracted from {extension} file: {fileName}. The document may be an image without readable text.";
+            }
+            
+            return result;
         }
-        
-        return string.Empty;
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error extracting text from document using OCR");
+            
+            // Fallback to placeholder text if OCR fails
+            var fileName = processingResult.ProcessedImage?.FileName ?? "Unknown";
+            var extension = processingResult.ProcessedImage?.OriginalFormat?.ToLowerInvariant() ?? "unknown";
+            return $"[OCR_ERROR] Failed to extract text from {extension} file: {fileName}. Error: {ex.Message}";
+        }
+    }
+
+    /// <summary>
+    /// Extracts text from a single image file using Tesseract OCR
+    /// </summary>
+    /// <param name="imagePath">Path to the image file</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Extracted text content</returns>
+    private async Task<string> ExtractTextFromImageAsync(string imagePath, CancellationToken cancellationToken)
+    {
+        return await Task.Run(() =>
+        {
+            try
+            {
+                if (!File.Exists(imagePath))
+                {
+                    _logger?.LogWarning("Image file not found for OCR: {ImagePath}", imagePath);
+                    return string.Empty;
+                }
+
+                // Get the tessdata path relative to the output directory
+                var tessdataPath = Path.Combine(AppContext.BaseDirectory, "tessdata");
+                if (!Directory.Exists(tessdataPath))
+                {
+                    _logger?.LogError("Tessdata directory not found at: {TessdataPath}", tessdataPath);
+                    return string.Empty;
+                }
+
+                using var engine = new Tesseract.TesseractEngine(tessdataPath, "eng", Tesseract.EngineMode.Default);
+                using var img = Tesseract.Pix.LoadFromFile(imagePath);
+                using var page = engine.Process(img);
+                
+                var text = page.GetText();
+                
+                // Clean up the extracted text
+                if (!string.IsNullOrWhiteSpace(text))
+                {
+                    // Remove excessive whitespace and normalize line endings
+                    text = System.Text.RegularExpressions.Regex.Replace(text, @"\s+", " ");
+                    text = text.Replace("\n ", "\n").Replace(" \n", "\n");
+                    text = System.Text.RegularExpressions.Regex.Replace(text, @"\n\s*\n", "\n");
+                }
+                
+                return text?.Trim() ?? string.Empty;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error during OCR processing of image: {ImagePath}", imagePath);
+                return string.Empty;
+            }
+        }, cancellationToken);
     }
 
     /// <summary>
