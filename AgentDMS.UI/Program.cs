@@ -450,46 +450,51 @@ class Program
 
     private static void LogBatchMetrics(List<AgentDMS.Core.Models.ProcessingResult> results)
     {
-        Console.WriteLine("\n=== Processing Metrics Summary ===");
+        Console.WriteLine("\n=== Batch Processing Summary Statistics ===");
         
-        var successfulResults = results.Where(r => r.Success && r.Metrics != null).ToList();
-        if (!successfulResults.Any())
+        var totalFiles = results.Count;
+        var successfulResults = results.Where(r => r.Success).ToList();
+        var failedResults = results.Where(r => !r.Success).ToList();
+        var successfulWithMetrics = successfulResults.Where(r => r.Metrics != null).ToList();
+        
+        // Overall Statistics
+        Console.WriteLine($"Total files attempted: {totalFiles}");
+        Console.WriteLine($"Successful: {successfulResults.Count} ({(successfulResults.Count * 100.0 / totalFiles):F1}%)");
+        Console.WriteLine($"Failed: {failedResults.Count} ({(failedResults.Count * 100.0 / totalFiles):F1}%)");
+        
+        if (!successfulWithMetrics.Any())
         {
-            Console.WriteLine("No metrics available for successful results.");
+            Console.WriteLine("No detailed metrics available for successful results.");
             return;
         }
 
-        var metrics = successfulResults.Select(r => r.Metrics!).ToList();
+        var metrics = successfulWithMetrics.Select(r => r.Metrics!).ToList();
+        Console.WriteLine($"Files with detailed metrics: {metrics.Count}");
 
-        // Aggregate timing statistics
-        Console.WriteLine($"Total files processed: {successfulResults.Count}");
-        Console.WriteLine($"Average processing time: {metrics.Average(m => m.TotalProcessingTime?.TotalMilliseconds ?? 0):F0} ms");
+        // Total Processing Time Statistics
+        var totalProcessingTimes = metrics.Where(m => m.TotalProcessingTime.HasValue)
+            .Select(m => m.TotalProcessingTime!.Value.TotalMilliseconds).ToList();
         
-        if (metrics.Any(m => m.FileLoadTime.HasValue))
+        if (totalProcessingTimes.Any())
         {
-            var avgFileLoad = metrics.Where(m => m.FileLoadTime.HasValue).Average(m => m.FileLoadTime!.Value.TotalMilliseconds);
-            Console.WriteLine($"Average file load time: {avgFileLoad:F0} ms");
+            Console.WriteLine("\n--- Total Processing Time Statistics ---");
+            Console.WriteLine($"Average: {totalProcessingTimes.Average():F0} ms");
+            Console.WriteLine($"Minimum: {totalProcessingTimes.Min():F0} ms");
+            Console.WriteLine($"Maximum: {totalProcessingTimes.Max():F0} ms");
+            Console.WriteLine($"Median: {GetMedian(totalProcessingTimes):F0} ms");
+            Console.WriteLine($"Total cumulative: {totalProcessingTimes.Sum():F0} ms ({totalProcessingTimes.Sum() / 1000:F1} seconds)");
         }
 
-        if (metrics.Any(m => m.ImageDecodeTime.HasValue))
-        {
-            var avgDecode = metrics.Where(m => m.ImageDecodeTime.HasValue).Average(m => m.ImageDecodeTime!.Value.TotalMilliseconds);
-            Console.WriteLine($"Average image decode time: {avgDecode:F0} ms");
-        }
+        // Detailed Step Statistics
+        Console.WriteLine("\n--- Processing Step Statistics ---");
+        
+        PrintStepStatistics("File Load", metrics.Where(m => m.FileLoadTime.HasValue).Select(m => m.FileLoadTime!.Value.TotalMilliseconds));
+        PrintStepStatistics("Image Decode", metrics.Where(m => m.ImageDecodeTime.HasValue).Select(m => m.ImageDecodeTime!.Value.TotalMilliseconds));
+        PrintStepStatistics("Conversion", metrics.Where(m => m.ConversionTime.HasValue).Select(m => m.ConversionTime!.Value.TotalMilliseconds));
+        PrintStepStatistics("Thumbnail Generation", metrics.Where(m => m.ThumbnailGenerationTime.HasValue).Select(m => m.ThumbnailGenerationTime!.Value.TotalMilliseconds));
+        PrintStepStatistics("AI Analysis", metrics.Where(m => m.AiAnalysisTime.HasValue).Select(m => m.AiAnalysisTime!.Value.TotalMilliseconds));
 
-        if (metrics.Any(m => m.ConversionTime.HasValue))
-        {
-            var avgConversion = metrics.Where(m => m.ConversionTime.HasValue).Average(m => m.ConversionTime!.Value.TotalMilliseconds);
-            Console.WriteLine($"Average conversion time: {avgConversion:F0} ms");
-        }
-
-        if (metrics.Any(m => m.ThumbnailGenerationTime.HasValue))
-        {
-            var avgThumbnail = metrics.Where(m => m.ThumbnailGenerationTime.HasValue).Average(m => m.ThumbnailGenerationTime!.Value.TotalMilliseconds);
-            Console.WriteLine($"Average thumbnail generation time: {avgThumbnail:F0} ms");
-        }
-
-        // Identify slowest steps on average
+        // Performance Insights
         var stepTimes = new Dictionary<string, double>();
         
         if (metrics.Any(m => m.FileLoadTime.HasValue))
@@ -503,15 +508,62 @@ class Program
         
         if (metrics.Any(m => m.ThumbnailGenerationTime.HasValue))
             stepTimes["Thumbnail Generation"] = metrics.Where(m => m.ThumbnailGenerationTime.HasValue).Average(m => m.ThumbnailGenerationTime!.Value.TotalMilliseconds);
+        
+        if (metrics.Any(m => m.AiAnalysisTime.HasValue))
+            stepTimes["AI Analysis"] = metrics.Where(m => m.AiAnalysisTime.HasValue).Average(m => m.AiAnalysisTime!.Value.TotalMilliseconds);
 
         if (stepTimes.Any())
         {
-            Console.WriteLine("\nSlowest processing steps (average):");
-            var sortedSteps = stepTimes.OrderByDescending(kvp => kvp.Value).Take(3);
+            Console.WriteLine("\n--- Performance Insights ---");
+            Console.WriteLine("Slowest processing steps (by average time):");
+            var sortedSteps = stepTimes.OrderByDescending(kvp => kvp.Value).Take(5);
             foreach (var step in sortedSteps)
             {
                 Console.WriteLine($"  {step.Key}: {step.Value:F0} ms");
             }
+            
+            // Show step time distribution
+            var totalStepTime = stepTimes.Values.Sum();
+            if (totalStepTime > 0)
+            {
+                Console.WriteLine("\nProcessing time distribution:");
+                foreach (var step in stepTimes.OrderByDescending(kvp => kvp.Value))
+                {
+                    var percentage = (step.Value / totalStepTime) * 100;
+                    Console.WriteLine($"  {step.Key}: {percentage:F1}%");
+                }
+            }
+        }
+    }
+
+    private static void PrintStepStatistics(string stepName, IEnumerable<double> times)
+    {
+        var timesList = times.ToList();
+        if (!timesList.Any()) return;
+
+        Console.WriteLine($"{stepName}:");
+        Console.WriteLine($"  Count: {timesList.Count} files");
+        Console.WriteLine($"  Average: {timesList.Average():F0} ms");
+        Console.WriteLine($"  Min: {timesList.Min():F0} ms");
+        Console.WriteLine($"  Max: {timesList.Max():F0} ms");
+        Console.WriteLine($"  Median: {GetMedian(timesList):F0} ms");
+        Console.WriteLine($"  Total: {timesList.Sum():F0} ms");
+    }
+
+    private static double GetMedian(List<double> values)
+    {
+        if (!values.Any()) return 0;
+        
+        var sorted = values.OrderBy(x => x).ToList();
+        var count = sorted.Count;
+        
+        if (count % 2 == 0)
+        {
+            return (sorted[count / 2 - 1] + sorted[count / 2]) / 2.0;
+        }
+        else
+        {
+            return sorted[count / 2];
         }
     }
 

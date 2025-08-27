@@ -518,6 +518,46 @@ header h1 i {
     color: #e53e3e;
     font-weight: 600;
 }
+
+/* Enhanced metrics sections */
+.metrics-section {
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(52, 152, 219, 0.2);
+}
+
+.metrics-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.metrics-subtitle {
+    color: #2c5282;
+    margin-bottom: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.step-metrics {
+    background: rgba(52, 152, 219, 0.05);
+    border-radius: 4px;
+    padding: 8px;
+    margin-bottom: 8px;
+}
+
+.step-metrics:last-child {
+    margin-bottom: 0;
+}
+
+.step-metrics strong {
+    display: block;
+    color: #2c5282;
+    margin-bottom: 4px;
+    font-size: 0.8rem;
+}
 .fade-in {
     animation: fadeIn 0.5s ease-in;
 }

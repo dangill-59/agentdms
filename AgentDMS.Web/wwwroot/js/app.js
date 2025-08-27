@@ -747,41 +747,109 @@ function createTimingMetrics(result) {
 function displayBatchResults(container, results) {
     const successful = results.filter(r => r.success).length;
     const failed = results.length - successful;
+    const total = results.length;
     
     let html = `
         <div class="alert alert-info fade-in">
             <h6><i class="bi bi-collection"></i> Batch Processing Complete</h6>
             <p class="mb-1">
                 <span class="badge bg-success me-2">${successful} Successful</span>
-                <span class="badge bg-danger">${failed} Failed</span>
+                <span class="badge bg-danger me-2">${failed} Failed</span>
+                <span class="badge bg-secondary">${total} Total</span>
             </p>
+            <div class="mt-2">
+                <small class="text-muted">
+                    Success Rate: ${(successful / total * 100).toFixed(1)}% | 
+                    Failure Rate: ${(failed / total * 100).toFixed(1)}%
+                </small>
+            </div>
         </div>
     `;
     
-    // Show timing summary for successful results
+    // Show comprehensive timing summary for successful results
     if (successful > 0) {
         const successfulResults = results.filter(r => r.success);
-        const totalProcessingTime = successfulResults.reduce((sum, r) => {
-            return sum + (r.processingTime ? parseFloat(r.processingTime) : 0);
-        }, 0);
+        const processingTimes = successfulResults
+            .map(r => r.processingTime ? parseFloat(r.processingTime) : 0)
+            .filter(t => t > 0);
         
-        html += `
-            <div class="timing-metrics">
-                <h6><i class="bi bi-stopwatch"></i> Batch Performance Summary</h6>
-                <div class="timing-row">
-                    <span class="timing-label">Total Files Processed:</span>
-                    <span class="timing-value">${successful}</span>
+        if (processingTimes.length > 0) {
+            const totalProcessingTime = processingTimes.reduce((sum, time) => sum + time, 0);
+            const avgProcessingTime = totalProcessingTime / processingTimes.length;
+            const minProcessingTime = Math.min(...processingTimes);
+            const maxProcessingTime = Math.max(...processingTimes);
+            const medianProcessingTime = getMedian(processingTimes);
+            
+            // Collect step-specific metrics
+            const stepMetrics = collectStepMetrics(successfulResults);
+            
+            html += `
+                <div class="timing-metrics">
+                    <h6><i class="bi bi-stopwatch"></i> Comprehensive Batch Statistics</h6>
+                    
+                    <!-- Overall Statistics -->
+                    <div class="metrics-section">
+                        <h6 class="metrics-subtitle"><i class="bi bi-bar-chart"></i> Overall Performance</h6>
+                        <div class="timing-row">
+                            <span class="timing-label">Total Files Attempted:</span>
+                            <span class="timing-value">${total}</span>
+                        </div>
+                        <div class="timing-row">
+                            <span class="timing-label">Files with Metrics:</span>
+                            <span class="timing-value">${processingTimes.length}</span>
+                        </div>
+                        <div class="timing-row">
+                            <span class="timing-label">Average Processing Time:</span>
+                            <span class="timing-value">${avgProcessingTime.toFixed(2)}s</span>
+                        </div>
+                        <div class="timing-row">
+                            <span class="timing-label">Minimum Processing Time:</span>
+                            <span class="timing-value">${minProcessingTime.toFixed(2)}s</span>
+                        </div>
+                        <div class="timing-row">
+                            <span class="timing-label">Maximum Processing Time:</span>
+                            <span class="timing-value">${maxProcessingTime.toFixed(2)}s</span>
+                        </div>
+                        <div class="timing-row">
+                            <span class="timing-label">Median Processing Time:</span>
+                            <span class="timing-value">${medianProcessingTime.toFixed(2)}s</span>
+                        </div>
+                        <div class="timing-row">
+                            <span class="timing-label">Total Processing Time:</span>
+                            <span class="timing-value total">${totalProcessingTime.toFixed(2)}s</span>
+                        </div>
+                    </div>
+                    
+                    ${stepMetrics.length > 0 ? `
+                        <!-- Step-by-Step Breakdown -->
+                        <div class="metrics-section">
+                            <h6 class="metrics-subtitle"><i class="bi bi-gear"></i> Processing Step Breakdown</h6>
+                            ${stepMetrics.map(step => `
+                                <div class="step-metrics">
+                                    <strong>${step.name}:</strong>
+                                    <div class="timing-row">
+                                        <span class="timing-label">Files Processed:</span>
+                                        <span class="timing-value">${step.count}</span>
+                                    </div>
+                                    <div class="timing-row">
+                                        <span class="timing-label">Average Time:</span>
+                                        <span class="timing-value">${step.avg.toFixed(2)}s</span>
+                                    </div>
+                                    <div class="timing-row">
+                                        <span class="timing-label">Total Time:</span>
+                                        <span class="timing-value">${step.total.toFixed(2)}s</span>
+                                    </div>
+                                    <div class="timing-row">
+                                        <span class="timing-label">Min/Max:</span>
+                                        <span class="timing-value">${step.min.toFixed(2)}s / ${step.max.toFixed(2)}s</span>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : ''}
                 </div>
-                <div class="timing-row">
-                    <span class="timing-label">Average Processing Time:</span>
-                    <span class="timing-value">${(totalProcessingTime / successful).toFixed(2)}s</span>
-                </div>
-                <div class="timing-row">
-                    <span class="timing-label">Total Processing Time:</span>
-                    <span class="timing-value total">${totalProcessingTime.toFixed(2)}s</span>
-                </div>
-            </div>
-        `;
+            `;
+        }
     }
     
     results.forEach((result, index) => {
@@ -814,6 +882,76 @@ function displayBatchResults(container, results) {
     });
     
     container.innerHTML = html;
+}
+
+// Helper functions for batch statistics
+function getMedian(values) {
+    if (!values || values.length === 0) return 0;
+    
+    const sorted = [...values].sort((a, b) => a - b);
+    const middle = Math.floor(sorted.length / 2);
+    
+    if (sorted.length % 2 === 0) {
+        return (sorted[middle - 1] + sorted[middle]) / 2;
+    } else {
+        return sorted[middle];
+    }
+}
+
+function collectStepMetrics(successfulResults) {
+    const stepMetrics = [];
+    
+    // Helper function to process a step
+    function processStep(stepName, timeExtractor) {
+        const times = successfulResults
+            .map(timeExtractor)
+            .filter(time => time && time > 0);
+            
+        if (times.length > 0) {
+            return {
+                name: stepName,
+                count: times.length,
+                avg: times.reduce((sum, time) => sum + time, 0) / times.length,
+                min: Math.min(...times),
+                max: Math.max(...times),
+                total: times.reduce((sum, time) => sum + time, 0)
+            };
+        }
+        return null;
+    }
+    
+    // Check each processing step
+    const stepConfigs = [
+        {
+            name: 'File Load',
+            extractor: r => r.metrics?.fileLoadTime ? parseFloat(r.metrics.fileLoadTime) : 0
+        },
+        {
+            name: 'Image Decode', 
+            extractor: r => r.metrics?.imageDecodeTime ? parseFloat(r.metrics.imageDecodeTime) : 0
+        },
+        {
+            name: 'Format Conversion',
+            extractor: r => r.metrics?.conversionTime ? parseFloat(r.metrics.conversionTime) : 0
+        },
+        {
+            name: 'Thumbnail Generation',
+            extractor: r => r.metrics?.thumbnailGenerationTime ? parseFloat(r.metrics.thumbnailGenerationTime) : 0
+        },
+        {
+            name: 'AI Analysis',
+            extractor: r => r.metrics?.aiAnalysisTime ? parseFloat(r.metrics.aiAnalysisTime) : 0
+        }
+    ];
+    
+    stepConfigs.forEach(config => {
+        const metric = processStep(config.name, config.extractor);
+        if (metric) {
+            stepMetrics.push(metric);
+        }
+    });
+    
+    return stepMetrics;
 }
 
 // Image viewer functions
