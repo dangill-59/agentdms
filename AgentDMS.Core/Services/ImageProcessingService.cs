@@ -43,7 +43,7 @@ public class ImageProcessingService
     /// <summary>
     /// Process a single image file asynchronously
     /// </summary>
-    public async Task<ProcessingResult> ProcessImageAsync(string filePath, DetailedProgressReporter? progressReporter = null, CancellationToken cancellationToken = default)
+    public async Task<ProcessingResult> ProcessImageAsync(string filePath, DetailedProgressReporter? progressReporter = null, CancellationToken cancellationToken = default, bool useMistralAI = false)
     {
         await _semaphore.WaitAsync(cancellationToken);
         
@@ -119,8 +119,8 @@ public class ImageProcessingService
                 metrics.TotalProcessingTime = totalTime;
                 result.Metrics = metrics;
                 
-                // Perform AI analysis if Mistral service is available
-                if (_mistralService != null)
+                // Perform AI analysis if Mistral service is available and user requested it
+                if (_mistralService != null && useMistralAI)
                 {
                     await PerformAiAnalysisAsync(result, progressReporter, cancellationToken);
                 }
@@ -151,7 +151,8 @@ public class ImageProcessingService
         IEnumerable<string> filePaths, 
         DetailedProgressReporter? progressReporter = null,
         IProgress<int>? progress = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool useMistralAI = false)
     {
         var filePathsList = filePaths.ToList();
         var results = new List<ProcessingResult>();
@@ -186,7 +187,7 @@ public class ImageProcessingService
                     });
                 }
                 
-                var result = await ProcessImageAsync(filePath, fileProgressReporter, cancellationToken);
+                var result = await ProcessImageAsync(filePath, fileProgressReporter, cancellationToken, useMistralAI);
                 
                 Interlocked.Increment(ref processedCount);
                 progress?.Report(processedCount);

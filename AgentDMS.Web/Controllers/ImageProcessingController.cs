@@ -68,6 +68,7 @@ public class ImageProcessingController : ControllerBase
     /// Upload and process an image file
     /// </summary>
     /// <param name="file">The image file to upload and process</param>
+    /// <param name="useMistralAI">Whether to process the document with Mistral AI for classification and data extraction</param>
     /// <returns>Upload response with job ID for tracking processing status</returns>
     /// <response code="200">File uploaded successfully and processing started</response>
     /// <response code="400">No file uploaded or invalid file</response>
@@ -84,7 +85,8 @@ public class ImageProcessingController : ControllerBase
     [RequestSizeLimit(100 * 1024 * 1024)] // 100MB default, can be overridden by configuration
     [DisableRequestSizeLimit] // Allow configuration to control limits instead
     public async Task<ActionResult<UploadResponse>> UploadAndProcessImage(
-        [SwaggerParameter("Image file to upload")] IFormFile file)
+        [SwaggerParameter("Image file to upload")] IFormFile file,
+        [SwaggerParameter("Whether to process with Mistral AI")] bool useMistralAI = false)
     {
         if (file == null || file.Length == 0)
         {
@@ -105,7 +107,7 @@ public class ImageProcessingController : ControllerBase
             }
 
             // Enqueue job for background processing
-            var jobId = await _backgroundJobService.EnqueueJobAsync(tempFilePath);
+            var jobId = await _backgroundJobService.EnqueueJobAsync(tempFilePath, useMistralAI);
 
             _logger.LogInformation("File uploaded successfully. Job ID: {JobId}, File: {FileName}", jobId, file.FileName);
 
@@ -377,7 +379,7 @@ public class ImageProcessingController : ControllerBase
                 await _progressBroadcaster.BroadcastProgress(jobId, progress);
             });
 
-            var result = await _imageProcessor.ProcessImageAsync(request.FilePath, progressReporter);
+            var result = await _imageProcessor.ProcessImageAsync(request.FilePath, progressReporter, CancellationToken.None, request.UseMistralAI);
             
             return Ok(new { jobId, result });
         }
@@ -783,6 +785,13 @@ public class ProcessImageRequest
     [Required]
     [SwaggerSchema("Full file path to the image file")]
     public string FilePath { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// Whether to process with Mistral AI for document classification and data extraction
+    /// </summary>
+    /// <example>true</example>
+    [SwaggerSchema("Whether to process with Mistral AI")]
+    public bool UseMistralAI { get; set; } = false;
 }
 
 /// <summary>
