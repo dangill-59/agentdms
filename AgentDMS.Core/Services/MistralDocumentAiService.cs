@@ -121,8 +121,7 @@ public class MistralDocumentAiService
                         Content = prompt
                     }
                 },
-                Temperature = 0.1, // Low temperature for consistent results
-                MaxTokens = 1000
+                Temperature = 0.1 // Low temperature for consistent results
             };
 
             var requestJson = JsonSerializer.Serialize(request, _jsonOptions);
@@ -288,7 +287,6 @@ internal class MistralChatRequest
     public string Model { get; set; } = string.Empty;
     public List<MistralMessage> Messages { get; set; } = new();
     public double Temperature { get; set; } = 0.1;
-    public int MaxTokens { get; set; } = 1000;
 }
 
 internal class MistralMessage

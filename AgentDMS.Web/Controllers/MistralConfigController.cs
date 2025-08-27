@@ -123,8 +123,7 @@ public class MistralConfigController : ControllerBase
             {
                 model = config.Model,
                 messages = new[] { new { role = "user", content = "test" } },
-                temperature = config.Temperature,
-                max_tokens = 1
+                temperature = config.Temperature
             };
 
             var requestJson = JsonSerializer.Serialize(testRequest, new JsonSerializerOptions
