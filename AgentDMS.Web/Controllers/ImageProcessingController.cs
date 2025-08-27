@@ -81,6 +81,8 @@ public class ImageProcessingController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     [Consumes("multipart/form-data")]
+    [RequestSizeLimit(100 * 1024 * 1024)] // 100MB default, can be overridden by configuration
+    [DisableRequestSizeLimit] // Allow configuration to control limits instead
     public async Task<ActionResult<UploadResponse>> UploadAndProcessImage(
         [SwaggerParameter("Image file to upload")] IFormFile file)
     {
@@ -141,6 +143,8 @@ public class ImageProcessingController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     [Consumes("multipart/form-data")]
+    [RequestSizeLimit(100 * 1024 * 1024)] // 100MB default, can be overridden by configuration
+    [DisableRequestSizeLimit] // Allow configuration to control limits instead
     public async Task<ActionResult<BatchUploadResponse>> UploadMultipleFiles(
         [SwaggerParameter("Image files to upload")] List<IFormFile> files)
     {
