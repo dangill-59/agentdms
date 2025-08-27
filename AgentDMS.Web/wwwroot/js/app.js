@@ -1190,13 +1190,8 @@ function updateProgressBarColor(progressBar, status) {
 // Mistral Configuration Functions
 async function loadMistralConfig() {
     try {
-        const response = await apiCall('mistralconfig');
-        if (response.ok) {
-            const config = await response.json();
-            populateMistralForm(config);
-        } else {
-            showMistralStatus('Failed to load configuration', 'error');
-        }
+        const config = await apiCall('mistralconfig');
+        populateMistralForm(config);
     } catch (error) {
         console.error('Error loading Mistral config:', error);
         showMistralStatus('Error loading configuration', 'error');
@@ -1225,7 +1220,7 @@ async function saveMistralConfig(event) {
     };
     
     try {
-        const response = await apiCall('mistralconfig', {
+        await apiCall('mistralconfig', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -1233,12 +1228,7 @@ async function saveMistralConfig(event) {
             body: JSON.stringify(config)
         });
         
-        if (response.ok) {
-            showMistralStatus('Configuration saved successfully!', 'success');
-        } else {
-            const error = await response.json();
-            showMistralStatus(`Failed to save configuration: ${error.message || response.statusText}`, 'error');
-        }
+        showMistralStatus('Configuration saved successfully!', 'success');
     } catch (error) {
         console.error('Error saving Mistral config:', error);
         showMistralStatus('Error saving configuration', 'error');
@@ -1267,7 +1257,7 @@ async function testMistralConfig() {
     testBtn.disabled = true;
     
     try {
-        const response = await apiCall('mistralconfig/test', {
+        const result = await apiCall('mistralconfig/test', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -1275,9 +1265,7 @@ async function testMistralConfig() {
             body: JSON.stringify(config)
         });
         
-        const result = await response.json();
-        
-        if (response.ok && result.success) {
+        if (result.success) {
             showMistralStatus('Configuration test successful!', 'success');
         } else {
             showMistralStatus(`Configuration test failed: ${result.message || result.details || 'Unknown error'}`, 'error');
