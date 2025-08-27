@@ -7,6 +7,7 @@ A comprehensive C# utility for image file processing with support for multiple f
 ✅ **Multi-format Support**: JPEG, PNG, BMP, GIF, TIFF, PDF, WebP  
 ✅ **Multipage Processing**: Automatically splits TIFF and PDF files into individual pages  
 ✅ **PNG Conversion**: Converts all supported formats to PNG while preserving original format metadata  
+✅ **OCR Text Extraction**: Extracts text from images using Tesseract OCR for AI analysis  
 ✅ **Thumbnail Generation**: Creates browser-friendly thumbnails with customizable sizes  
 ✅ **Multithreading**: Optimized for handling large files and batch processing  
 ✅ **Interactive CLI**: User-friendly command-line interface for testing and operation  
@@ -26,7 +27,7 @@ The solution consists of four main projects:
 
 ### Core Components
 
-- `ImageProcessingService`: Main service for processing images and documents
+- `ImageProcessingService`: Main service for processing images and documents with OCR capabilities
 - `FileUploadService`: Handles file uploads and validation
 - `ThumbnailGenerator`: Utility for creating thumbnails and galleries
 - `ImageFile` & `ProcessingResult`: Models for representing processed images and results
@@ -401,6 +402,32 @@ dotnet run --project AgentDMS.UI -- --process image.pdf --output "Output" --no-m
 - Unsupported format detection
 - Processing failures with detailed messages
 - Graceful handling of corrupted files
+- OCR processing errors with fallback to placeholder text
+
+## OCR Text Extraction
+
+AgentDMS includes integrated OCR (Optical Character Recognition) capabilities using Tesseract for extracting text from image-based documents. This enables meaningful AI analysis of scanned documents, invoices, and other image files.
+
+**Features:**
+- **Automatic Text Extraction**: Extracts text from all processed images (PNG, JPEG, TIFF, PDF pages, etc.)
+- **Multi-page Document Support**: Processes each page of multi-page documents separately
+- **AI Integration**: Extracted text is automatically sent to Mistral AI for document analysis
+- **Error Handling**: Graceful fallback when OCR fails, with detailed error reporting
+- **Text Normalization**: Cleans and normalizes extracted text for better AI analysis
+
+**Supported Languages:**
+- English (eng) - Included by default
+- Additional language packs can be added to the `tessdata` directory
+
+**Technical Details:**
+- Uses Tesseract 5.x OCR engine
+- Processes PNG-converted images for optimal OCR accuracy
+- Includes text cleaning and whitespace normalization
+- Asynchronous processing to prevent UI blocking
+- Comprehensive logging for troubleshooting OCR issues
+
+**Output:**
+When OCR succeeds, the extracted text replaces placeholder content and is used for AI document analysis. If OCR fails, a descriptive error message is provided while allowing the rest of the processing pipeline to continue.
 
 ## Dependencies
 
@@ -408,11 +435,11 @@ dotnet run --project AgentDMS.UI -- --process image.pdf --output "Output" --no-m
 - **SixLabors.ImageSharp.Drawing**: Advanced image manipulation
 - **iText7**: PDF processing capabilities
 - **System.Drawing.Common**: TIFF multipage support
+- **Tesseract**: OCR text extraction from images for AI analysis
 
 ## Future Enhancements
 
 - Complete PDF to image conversion (requires additional libraries)
-- OCR text extraction from images
 - Image metadata preservation
 - Batch watermarking capabilities
 - Cloud storage integration
