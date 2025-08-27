@@ -25,6 +25,7 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="Moq" Version="4.18.4" />
     <PackageReference Include="Magick.NET-Q16-AnyCPU" Version="14.7.0" />
     <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.1.7" />
   </ItemGroup>

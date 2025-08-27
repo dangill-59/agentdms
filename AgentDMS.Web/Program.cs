@@ -6,6 +6,46 @@ using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Configure Kestrel server limits based on upload configuration
+builder.Services.Configure<Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServerOptions>(options =>
+{
+    // Get upload configuration to set appropriate limits
+    var configuration = builder.Configuration;
+    var uploadLimitsSection = configuration.GetSection("UploadLimits");
+    
+    var maxRequestBodySize = uploadLimitsSection.GetValue<long>("MaxRequestBodySizeBytes", 100 * 1024 * 1024);
+    
+    // Check environment variable override
+    var envMaxRequestSize = Environment.GetEnvironmentVariable("AGENTDMS_MAX_REQUEST_SIZE_MB");
+    if (!string.IsNullOrEmpty(envMaxRequestSize) && double.TryParse(envMaxRequestSize, out var maxRequestSizeMB))
+    {
+        maxRequestBodySize = (long)(maxRequestSizeMB * 1024 * 1024);
+    }
+    
+    options.Limits.MaxRequestBodySize = maxRequestBodySize;
+});
+
+// Configure form options for multipart uploads
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
+{
+    var configuration = builder.Configuration;
+    var uploadLimitsSection = configuration.GetSection("UploadLimits");
+    
+    var maxMultipartBodyLength = uploadLimitsSection.GetValue<long>("MaxMultipartBodyLengthBytes", 100 * 1024 * 1024);
+    
+    // Check environment variable override
+    var envMaxFileSize = Environment.GetEnvironmentVariable("AGENTDMS_MAX_FILE_SIZE_MB");
+    if (!string.IsNullOrEmpty(envMaxFileSize) && double.TryParse(envMaxFileSize, out var maxFileSizeMB))
+    {
+        maxMultipartBodyLength = (long)(maxFileSizeMB * 1024 * 1024);
+    }
+    
+    options.MultipartBodyLengthLimit = maxMultipartBodyLength;
+    options.ValueLengthLimit = int.MaxValue;
+    options.ValueCountLimit = int.MaxValue;
+    options.KeyLengthLimit = int.MaxValue;
+});
+
 // Add services to the container
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -58,8 +98,16 @@ builder.Services.AddSwaggerGen(options =>
 // Add SignalR
 builder.Services.AddSignalR();
 
-// Add AgentDMS Core services
-builder.Services.AddSingleton<FileUploadService>();
+// Add Upload Configuration Service
+builder.Services.AddSingleton<IUploadConfigService, UploadConfigService>();
+
+// Add AgentDMS Core services with configurable file upload service
+builder.Services.AddSingleton<FileUploadService>(provider =>
+{
+    var uploadConfigService = provider.GetRequiredService<IUploadConfigService>();
+    var config = uploadConfigService.GetConfigAsync().Result;
+    return new FileUploadService(uploadDirectory: null, maxFileSize: config.MaxFileSizeBytes);
+});
 builder.Services.AddSingleton<IProgressBroadcaster, SignalRProgressBroadcaster>();
 builder.Services.AddSingleton<IBackgroundJobService, BackgroundJobService>();
 builder.Services.AddHostedService<BackgroundJobService>(provider => 
