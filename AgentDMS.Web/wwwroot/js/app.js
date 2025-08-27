@@ -366,6 +366,10 @@ async function handleUpload(event) {
         const formData = new FormData();
         formData.append('file', fileInput.files[0]);
         
+        // Add Mistral AI flag
+        const useMistralAI = document.getElementById('useMistralAI').checked;
+        formData.append('useMistralAI', useMistralAI.toString());
+        
         const response = await fetch('/api/imageprocessing/upload', {
             method: 'POST',
             body: formData

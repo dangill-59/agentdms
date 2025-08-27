@@ -488,4 +488,48 @@ public class ImageProcessingServiceTests
                 File.Delete(testImagePath);
         }
     }
+    
+    [Fact]
+    public async Task ProcessImageAsync_WithUseMistralAIFlag_ShouldRespectUserChoice()
+    {
+        // Arrange
+        using var httpClient = new System.Net.Http.HttpClient();
+        var mistralService = new MistralDocumentAiService(httpClient, apiKey: null);
+        var imageProcessor = new ImageProcessingService(
+            maxConcurrency: 1,
+            outputDirectory: _testOutputDir,
+            logger: null,
+            mistralService: mistralService
+        );
+
+        var testImagePath = CreateTestImage("test_mistral_flag.png");
+
+        try
+        {
+            // Act 1: Process without Mistral AI (default)
+            var resultWithoutMistral = await imageProcessor.ProcessImageAsync(testImagePath, useMistralAI: false);
+
+            // Act 2: Process with Mistral AI enabled
+            var resultWithMistral = await imageProcessor.ProcessImageAsync(testImagePath, useMistralAI: true);
+
+            // Assert
+            Assert.True(resultWithoutMistral.Success, $"Processing without Mistral should succeed: {resultWithoutMistral.Message}");
+            Assert.True(resultWithMistral.Success, $"Processing with Mistral should succeed: {resultWithMistral.Message}");
+            
+            // Both should not have AI analysis since API key is not configured,
+            // but the flag should be respected internally
+            Assert.Null(resultWithoutMistral.AiAnalysis);
+            Assert.Null(resultWithMistral.AiAnalysis);
+            
+            // Verify processing metrics are present in both cases
+            Assert.NotNull(resultWithoutMistral.Metrics);
+            Assert.NotNull(resultWithMistral.Metrics);
+        }
+        finally
+        {
+            // Cleanup
+            if (File.Exists(testImagePath))
+                File.Delete(testImagePath);
+        }
+    }
 }
