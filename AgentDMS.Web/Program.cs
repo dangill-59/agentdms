@@ -176,7 +176,6 @@ else
     });
 }
 
-app.UseCors();
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 
@@ -199,6 +198,7 @@ app.UseStaticFiles(new StaticFileOptions
 });
 
 app.UseRouting();
+app.UseCors();
 app.MapControllers();
 
 // Map SignalR hub with specific CORS policy for remote access
