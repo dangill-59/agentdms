@@ -68,7 +68,6 @@ public class ImageProcessingController : ControllerBase
     /// Upload and process an image file
     /// </summary>
     /// <param name="file">The image file to upload and process</param>
-    /// <param name="useMistralAI">Whether to process the document with Mistral AI for classification and data extraction</param>
     /// <returns>Upload response with job ID for tracking processing status</returns>
     /// <response code="200">File uploaded successfully and processing started</response>
     /// <response code="400">No file uploaded or invalid file</response>
@@ -85,9 +84,15 @@ public class ImageProcessingController : ControllerBase
     [RequestSizeLimit(100 * 1024 * 1024)] // 100MB default, can be overridden by configuration
     [DisableRequestSizeLimit] // Allow configuration to control limits instead
     public async Task<ActionResult<UploadResponse>> UploadAndProcessImage(
-        [SwaggerParameter("Image file to upload")] IFormFile file,
-        [SwaggerParameter("Whether to process with Mistral AI")] bool useMistralAI = false)
+        [SwaggerParameter("Image file to upload")] IFormFile file)
     {
+        // Manually read the useMistralAI parameter from form data to avoid model binding issues
+        var useMistralAIValue = Request.Form["useMistralAI"].ToString();
+        bool useMistralAiBool = useMistralAIValue?.ToLowerInvariant() == "true";
+        
+        _logger.LogInformation("Upload request received. File: {FileName}, UseMistralAI: {UseMistralAI}", 
+            file?.FileName ?? "null", useMistralAiBool);
+        
         if (file == null || file.Length == 0)
         {
             return BadRequest(new { error = "No file uploaded" });
@@ -107,7 +112,7 @@ public class ImageProcessingController : ControllerBase
             }
 
             // Enqueue job for background processing
-            var jobId = await _backgroundJobService.EnqueueJobAsync(tempFilePath, useMistralAI);
+            var jobId = await _backgroundJobService.EnqueueJobAsync(tempFilePath, useMistralAiBool);
 
             _logger.LogInformation("File uploaded successfully. Job ID: {JobId}, File: {FileName}", jobId, file.FileName);
 
