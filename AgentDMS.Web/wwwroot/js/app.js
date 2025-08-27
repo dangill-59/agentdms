@@ -85,6 +85,10 @@ function bindEventHandlers() {
     // Batch process form
     document.getElementById('batchForm').addEventListener('submit', handleBatchProcess);
     
+    // Folder selection for batch processing
+    document.getElementById('folderSelectBtn').addEventListener('click', handleFolderSelection);
+    document.getElementById('folderInput').addEventListener('change', handleFolderInputChange);
+    
     // Gallery form
     document.getElementById('galleryForm').addEventListener('submit', handleGalleryGeneration);
     
@@ -488,6 +492,70 @@ async function handleBatchProcess(event) {
             await safeSignalRInvoke("LeaveJob", jobId);
         }
     }
+}
+
+// Handle folder selection button click
+function handleFolderSelection() {
+    const folderInput = document.getElementById('folderInput');
+    folderInput.click();
+}
+
+// Handle folder input change (when folder is selected)
+function handleFolderInputChange(event) {
+    const files = event.target.files;
+    const pathsTextarea = document.getElementById('filePaths');
+    
+    if (!files || files.length === 0) {
+        return;
+    }
+    
+    // Get supported extensions from the system
+    const supportedExtensions = ['.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tif', '.tiff', '.pdf', '.webp'];
+    
+    // Filter files to only include supported formats
+    const supportedFiles = Array.from(files).filter(file => {
+        const extension = '.' + file.name.split('.').pop().toLowerCase();
+        return supportedExtensions.includes(extension);
+    });
+    
+    if (supportedFiles.length === 0) {
+        alert('No supported image files found in the selected folder.\nSupported formats: ' + supportedExtensions.join(', '));
+        return;
+    }
+    
+    // Generate file paths and populate textarea
+    const filePaths = supportedFiles.map(file => file.webkitRelativePath || file.name);
+    pathsTextarea.value = filePaths.join('\n');
+    
+    // Show success message
+    const folderName = supportedFiles[0].webkitRelativePath ? supportedFiles[0].webkitRelativePath.split('/')[0] : 'selected folder';
+    showSuccessMessage(`Found ${supportedFiles.length} supported image(s) in "${folderName}"`);
+    
+    // Clear the file input for next selection
+    event.target.value = '';
+}
+
+// Helper function to show success message
+function showSuccessMessage(message) {
+    // Create a temporary success alert
+    const alertDiv = document.createElement('div');
+    alertDiv.className = 'alert alert-success alert-dismissible fade show mt-2';
+    alertDiv.innerHTML = `
+        <i class="bi bi-check-circle"></i> ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    // Insert after the folder selection controls
+    const formElement = document.getElementById('batchForm');
+    const firstChild = formElement.querySelector('.mb-3');
+    firstChild.appendChild(alertDiv);
+    
+    // Auto-dismiss after 5 seconds
+    setTimeout(() => {
+        if (alertDiv && alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 5000);
 }
 
 // Handle gallery generation

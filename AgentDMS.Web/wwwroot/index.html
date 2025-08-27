@@ -340,8 +340,20 @@
                                     <form id="batchForm">
                                         <div class="mb-3">
                                             <label for="filePaths" class="form-label">File Paths (one per line)</label>
-                                            <textarea class="form-control" id="filePaths" rows="5" 
-                                                      placeholder="C:\path\to\image1.jpg&#10;C:\path\to\image2.png&#10;C:\path\to\document.pdf" required></textarea>
+                                            <div class="input-group mb-2">
+                                                <textarea class="form-control" id="filePaths" rows="5" 
+                                                          placeholder="C:\path\to\image1.jpg&#10;C:\path\to\image2.png&#10;C:\path\to\document.pdf" required></textarea>
+                                                <div class="input-group-append">
+                                                    <button type="button" class="btn btn-outline-secondary" id="folderSelectBtn" title="Select folder to import all images">
+                                                        <i class="bi bi-folder-open"></i> Browse Folder
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div class="form-text">
+                                                <small><i class="bi bi-info-circle"></i> Enter file paths manually or click "Browse Folder" to select a directory and import all supported images.</small>
+                                            </div>
+                                            <!-- Hidden file input for folder selection -->
+                                            <input type="file" id="folderInput" webkitdirectory directory multiple style="display: none;" accept=".jpg,.jpeg,.png,.bmp,.gif,.tif,.tiff,.pdf,.webp">
                                         </div>
                                         <button type="submit" class="btn btn-primary" id="batchBtn">
                                             <i class="bi bi-collection"></i> Process All Files
