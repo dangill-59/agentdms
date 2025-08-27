@@ -558,6 +558,48 @@ header h1 i {
     margin-bottom: 4px;
     font-size: 0.8rem;
 }
+
+/* AI Analysis display styles */
+.ai-analysis-section {
+    background: #f0f9f0;
+    border: 1px solid #28a745;
+    border-radius: 6px;
+    padding: 12px;
+    margin-top: 15px;
+}
+
+.ai-analysis-section h6 {
+    color: #155724;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.ai-analysis-content {
+    font-size: 0.85rem;
+}
+
+.ai-field {
+    margin-bottom: 6px;
+}
+
+.ai-field strong {
+    color: #155724;
+}
+
+.ai-extracted-data {
+    background: rgba(40, 167, 69, 0.05);
+    border-radius: 4px;
+    padding: 8px;
+    margin-top: 8px;
+}
+
+.ai-extracted-data strong {
+    color: #155724;
+    display: block;
+    margin-bottom: 4px;
+}
+
 .fade-in {
     animation: fadeIn 0.5s ease-in;
 }

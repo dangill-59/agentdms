@@ -674,6 +674,9 @@ function displayProcessingResult(container, result) {
                         <!-- Detailed Timing Metrics -->
                         ${createTimingMetrics(result)}
                         
+                        <!-- Mistral AI Analysis Results -->
+                        ${createAiAnalysisDisplay(result.aiAnalysis)}
+                        
                         <div class="mt-3">
                             <div class="row">
                                 <div class="col-md-6">
@@ -736,6 +739,12 @@ function createTimingMetrics(result) {
                     <span class="timing-value">${formatDuration(metrics.thumbnailGenerationTime)}</span>
                 </div>
             ` : ''}
+            ${metrics.aiAnalysisTime ? `
+                <div class="timing-row">
+                    <span class="timing-label">AI Analysis:</span>
+                    <span class="timing-value">${formatDuration(metrics.aiAnalysisTime)}</span>
+                </div>
+            ` : ''}
             <div class="timing-row">
                 <span class="timing-label">Total Processing:</span>
                 <span class="timing-value">${formatDuration(processingTime)}</span>
@@ -743,6 +752,55 @@ function createTimingMetrics(result) {
             <div class="timing-row">
                 <span class="timing-label">UI Rendering:</span>
                 <span class="timing-value">${formatDuration(renderingTime)}</span>
+            </div>
+        </div>
+    `;
+}
+
+function createAiAnalysisDisplay(aiAnalysis) {
+    if (!aiAnalysis || !aiAnalysis.success) {
+        return '';
+    }
+    
+    const confidenceClass = aiAnalysis.confidence >= 0.8 ? 'text-success' : 
+                           aiAnalysis.confidence >= 0.5 ? 'text-warning' : 'text-danger';
+    
+    return `
+        <div class="ai-analysis-section mt-3">
+            <h6><i class="bi bi-robot"></i> Mistral AI Analysis</h6>
+            <div class="ai-analysis-content">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="ai-field">
+                            <strong>Document Type:</strong> 
+                            <span class="badge bg-primary ms-1">${aiAnalysis.documentType || 'Unknown'}</span>
+                        </div>
+                        <div class="ai-field">
+                            <strong>Confidence:</strong> 
+                            <span class="${confidenceClass} fw-bold ms-1">${(aiAnalysis.confidence * 100).toFixed(1)}%</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        ${aiAnalysis.summary ? `
+                            <div class="ai-field">
+                                <strong>Summary:</strong>
+                                <div class="text-muted small mt-1">${aiAnalysis.summary}</div>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+                ${Object.keys(aiAnalysis.extractedData || {}).length > 0 ? `
+                    <div class="ai-extracted-data mt-2">
+                        <strong>Extracted Data:</strong>
+                        <div class="row mt-1">
+                            ${Object.entries(aiAnalysis.extractedData).map(([key, value]) => `
+                                <div class="col-md-6 mb-1">
+                                    <small><strong>${key}:</strong> ${value}</small>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                ` : ''}
             </div>
         </div>
     `;
