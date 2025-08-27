@@ -446,14 +446,57 @@ async function handleBatchProcess(event) {
     
     const renderStartTime = performance.now();
     let jobId = null;
+    let finalFilePaths = filePaths;
     
     try {
+        // Check if we have File objects from folder selection that need to be uploaded first
+        const hasFiles = pathsTextarea.getAttribute('data-has-files') === 'true';
+        
+        if (hasFiles && window.selectedFiles && window.selectedFiles.length > 0) {
+            // Upload files first
+            showProgress(progressDiv, batchBtn, 'Uploading files to server...');
+            
+            const formData = new FormData();
+            window.selectedFiles.forEach(file => {
+                formData.append('files', file);
+            });
+            
+            const uploadResponse = await fetch('/api/imageprocessing/upload-batch', {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (!uploadResponse.ok) {
+                const errorData = await uploadResponse.json();
+                throw new Error(errorData.error || 'Failed to upload files');
+            }
+            
+            const uploadResult = await uploadResponse.json();
+            
+            if (uploadResult.errorCount > 0) {
+                console.warn('Some files failed to upload:', uploadResult.errors);
+            }
+            
+            if (uploadResult.successCount === 0) {
+                throw new Error('No files were successfully uploaded');
+            }
+            
+            // Use the server file paths for processing
+            finalFilePaths = uploadResult.uploadedFiles.map(file => file.serverFilePath);
+            
+            // Clear the file objects after successful upload
+            window.selectedFiles = null;
+            pathsTextarea.removeAttribute('data-has-files');
+            
+            showProgress(progressDiv, batchBtn, `Files uploaded (${uploadResult.successCount}/${uploadResult.successCount + uploadResult.errorCount}). Processing...`);
+        }
+        
         const response = await fetch('/api/imageprocessing/batch-process', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ filePaths })
+            body: JSON.stringify({ filePaths: finalFilePaths })
         });
         
         if (!response.ok) {
@@ -523,13 +566,17 @@ function handleFolderInputChange(event) {
         return;
     }
     
-    // Generate file paths and populate textarea
+    // Store the File objects for later upload and generate display paths
     const filePaths = supportedFiles.map(file => file.webkitRelativePath || file.name);
     pathsTextarea.value = filePaths.join('\n');
     
+    // Store the actual File objects for upload when processing starts
+    pathsTextarea.setAttribute('data-has-files', 'true');
+    window.selectedFiles = supportedFiles;
+    
     // Show success message
     const folderName = supportedFiles[0].webkitRelativePath ? supportedFiles[0].webkitRelativePath.split('/')[0] : 'selected folder';
-    showSuccessMessage(`Found ${supportedFiles.length} supported image(s) in "${folderName}"`);
+    showSuccessMessage(`Found ${supportedFiles.length} supported image(s) in "${folderName}". Files will be uploaded when processing starts.`);
     
     // Clear the file input for next selection
     event.target.value = '';

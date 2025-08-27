@@ -421,4 +421,71 @@ public class ImageProcessingServiceTests
                 File.Delete(testImagePath);
         }
     }
+
+    [Fact]
+    public async Task ProcessMultipleImagesAsync_WithFullPaths_ShouldSucceedForAllFiles()
+    {
+        // Arrange - Create multiple test images
+        var testImages = new List<string>();
+        try
+        {
+            for (int i = 1; i <= 3; i++)
+            {
+                var imagePath = CreateTestImage($"batch_test_{i}.png");
+                testImages.Add(imagePath);
+            }
+
+            // Act
+            var results = await _imageProcessor.ProcessMultipleImagesAsync(testImages);
+
+            // Assert
+            Assert.Equal(testImages.Count, results.Count);
+            Assert.All(results, result => Assert.True(result.Success, $"All results should be successful: {result.Message}"));
+            
+            // Verify each result has the expected properties
+            foreach (var result in results)
+            {
+                Assert.NotNull(result.ProcessedImage);
+                Assert.NotNull(result.Metrics);
+                Assert.True(File.Exists(result.ProcessedImage.ConvertedPngPath));
+            }
+        }
+        finally
+        {
+            // Cleanup
+            foreach (var imagePath in testImages)
+            {
+                if (File.Exists(imagePath))
+                    File.Delete(imagePath);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ProcessMultipleImagesAsync_WithUncPaths_ShouldHandleCorrectly()
+    {
+        // Arrange - Create test image and simulate UNC path (for local testing)
+        var testImagePath = CreateTestImage("unc_test.png");
+        
+        try
+        {
+            // Simulate processing with the full absolute path (which includes drive letter - closest to UNC we can test locally)
+            var fullPath = Path.GetFullPath(testImagePath);
+            var filePaths = new List<string> { fullPath };
+
+            // Act
+            var results = await _imageProcessor.ProcessMultipleImagesAsync(filePaths);
+
+            // Assert
+            Assert.Single(results);
+            Assert.True(results[0].Success, $"Processing should succeed with full path: {results[0].Message}");
+            Assert.NotNull(results[0].ProcessedImage);
+        }
+        finally
+        {
+            // Cleanup
+            if (File.Exists(testImagePath))
+                File.Delete(testImagePath);
+        }
+    }
 }

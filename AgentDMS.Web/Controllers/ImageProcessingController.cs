@@ -125,6 +125,101 @@ public class ImageProcessingController : ControllerBase
     }
 
     /// <summary>
+    /// Upload multiple files for batch processing
+    /// </summary>
+    /// <param name="files">The image files to upload</param>
+    /// <returns>List of uploaded file paths for batch processing</returns>
+    /// <response code="200">Files uploaded successfully</response>
+    /// <response code="400">No files uploaded or invalid files</response>
+    /// <response code="500">Internal server error during upload</response>
+    [HttpPost("upload-batch")]
+    [SwaggerOperation(Summary = "Upload multiple files for batch processing", Description = "Uploads multiple image files and returns their server paths for batch processing.")]
+    [SwaggerResponse(200, "Files uploaded successfully", typeof(BatchUploadResponse))]
+    [SwaggerResponse(400, "Bad request - no files or invalid files")]
+    [SwaggerResponse(500, "Internal server error")]
+    [ProducesResponseType(typeof(BatchUploadResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    [Consumes("multipart/form-data")]
+    public async Task<ActionResult<BatchUploadResponse>> UploadMultipleFiles(
+        [SwaggerParameter("Image files to upload")] List<IFormFile> files)
+    {
+        if (files == null || files.Count == 0)
+        {
+            return BadRequest(new { error = "No files uploaded" });
+        }
+
+        var uploadedFiles = new List<UploadedFileInfo>();
+        var errors = new List<string>();
+
+        try
+        {
+            foreach (var file in files)
+            {
+                if (file == null || file.Length == 0)
+                {
+                    errors.Add($"Empty file: {file?.FileName ?? "unknown"}");
+                    continue;
+                }
+
+                try
+                {
+                    // Validate file extension
+                    var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+                    if (!FileUploadService.IsValidImageFile(extension))
+                    {
+                        errors.Add($"Unsupported file format: {file.FileName}");
+                        continue;
+                    }
+
+                    // Save uploaded file temporarily
+                    var tempPath = Path.GetTempFileName();
+                    var originalName = Path.GetFileNameWithoutExtension(file.FileName);
+                    var tempFilePath = Path.ChangeExtension(tempPath, extension);
+
+                    using (var stream = new FileStream(tempFilePath, FileMode.Create))
+                    {
+                        await file.CopyToAsync(stream);
+                    }
+
+                    uploadedFiles.Add(new UploadedFileInfo
+                    {
+                        OriginalFileName = file.FileName,
+                        ServerFilePath = tempFilePath,
+                        FileSize = file.Length
+                    });
+
+                    _logger.LogInformation("File uploaded for batch processing: {FileName} -> {ServerPath}", file.FileName, tempFilePath);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error uploading file: {FileName}", file.FileName);
+                    errors.Add($"Failed to upload {file.FileName}: {ex.Message}");
+                }
+            }
+
+            if (uploadedFiles.Count == 0)
+            {
+                return BadRequest(new { error = "No files were successfully uploaded", errors });
+            }
+
+            return Ok(new BatchUploadResponse
+            {
+                UploadedFiles = uploadedFiles,
+                SuccessCount = uploadedFiles.Count,
+                ErrorCount = errors.Count,
+                Errors = errors,
+                Message = $"Successfully uploaded {uploadedFiles.Count} files for batch processing"
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during batch file upload");
+            return StatusCode(500, new { error = "Batch upload failed", message = ex.Message });
+        }
+    }
+
+    /// <summary>
     /// Get job processing status
     /// </summary>
     /// <param name="jobId">The job ID to check status for</param>
@@ -852,4 +947,56 @@ public class ScannerConnectivityInfo
     /// Recommended solutions for remote scanner access
     /// </summary>
     public List<string> RecommendedSolutions { get; set; } = new();
+}
+
+/// <summary>
+/// Response model for batch file upload operations
+/// </summary>
+public class BatchUploadResponse
+{
+    /// <summary>
+    /// List of successfully uploaded files
+    /// </summary>
+    public List<UploadedFileInfo> UploadedFiles { get; set; } = new();
+    
+    /// <summary>
+    /// Number of files successfully uploaded
+    /// </summary>
+    public int SuccessCount { get; set; }
+    
+    /// <summary>
+    /// Number of files that failed to upload
+    /// </summary>
+    public int ErrorCount { get; set; }
+    
+    /// <summary>
+    /// List of error messages for failed uploads
+    /// </summary>
+    public List<string> Errors { get; set; } = new();
+    
+    /// <summary>
+    /// Overall result message
+    /// </summary>
+    public string Message { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Information about an uploaded file
+/// </summary>
+public class UploadedFileInfo
+{
+    /// <summary>
+    /// Original file name as uploaded by the client
+    /// </summary>
+    public string OriginalFileName { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// Full server-side file path where the file was stored
+    /// </summary>
+    public string ServerFilePath { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// File size in bytes
+    /// </summary>
+    public long FileSize { get; set; }
 }
