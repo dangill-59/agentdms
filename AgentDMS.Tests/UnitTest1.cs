@@ -1,6 +1,7 @@
 using Xunit;
 using System.IO;
 using System.Threading.Tasks;
+using System.Text.Json;
 using AgentDMS.Core.Services;
 using AgentDMS.Core.Models;
 using SixLabors.ImageSharp;
@@ -531,5 +532,55 @@ public class ImageProcessingServiceTests
             if (File.Exists(testImagePath))
                 File.Delete(testImagePath);
         }
+    }
+
+    [Fact]
+    public void MistralChatRequest_Serialization_ShouldNotIncludeMaxTokens()
+    {
+        // Arrange
+        using var httpClient = new System.Net.Http.HttpClient();
+        var mistralService = new MistralDocumentAiService(httpClient, apiKey: null);
+        
+        // Use reflection to create a MistralChatRequest to test serialization
+        var assembly = typeof(MistralDocumentAiService).Assembly;
+        var requestType = assembly.GetType("AgentDMS.Core.Services.MistralChatRequest");
+        Assert.NotNull(requestType);
+        
+        var request = Activator.CreateInstance(requestType);
+        Assert.NotNull(request);
+        
+        // Set properties
+        var modelProp = requestType.GetProperty("Model");
+        var messagesProp = requestType.GetProperty("Messages");
+        var temperatureProp = requestType.GetProperty("Temperature");
+        
+        Assert.NotNull(modelProp);
+        Assert.NotNull(messagesProp);
+        Assert.NotNull(temperatureProp);
+        
+        modelProp.SetValue(request, "test-model");
+        temperatureProp.SetValue(request, 0.1);
+        
+        // Create empty messages list
+        var messagesListType = messagesProp.PropertyType;
+        var messagesList = Activator.CreateInstance(messagesListType);
+        messagesProp.SetValue(request, messagesList);
+        
+        // Act - Serialize the request
+        var options = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            WriteIndented = false
+        };
+        var json = JsonSerializer.Serialize(request, options);
+        
+        // Assert - Verify maxTokens is not in the JSON
+        Assert.DoesNotContain("maxTokens", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("max_tokens", json, StringComparison.OrdinalIgnoreCase);
+        
+        // Verify expected properties are present
+        Assert.Contains("model", json);
+        Assert.Contains("messages", json);
+        Assert.Contains("temperature", json);
     }
 }
