@@ -120,6 +120,27 @@ public class ImageProcessingService
                 metrics.TotalProcessingTime = totalTime;
                 result.Metrics = metrics;
                 
+                // Always extract OCR text for UI display
+                try
+                {
+                    if (progressReporter != null)
+                        await progressReporter.ReportProgress(fileName, ProgressStatus.ProcessingFile, "Extracting text (OCR)...");
+                    
+                    var extractedText = await ExtractTextFromDocumentAsync(result, cancellationToken);
+                    result.ExtractedText = extractedText;
+                    
+                    if (!string.IsNullOrWhiteSpace(extractedText))
+                    {
+                        _logger?.LogInformation("Extracted {TextLength} characters of text from {FileName}", 
+                            extractedText.Length, fileName);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "OCR text extraction failed for {FileName}", fileName);
+                    // Don't fail the entire processing pipeline if OCR fails
+                }
+                
                 // Perform AI analysis if Mistral service is available and user requested it
                 if (_mistralService != null && useMistralAI)
                 {
@@ -464,17 +485,11 @@ public class ImageProcessingService
                 await progressReporter.ReportProgress(fileName, ProgressStatus.ProcessingFile, "Performing AI document analysis...");
 
             // Extract text from document
-            // TODO: Implement OCR text extraction from processed images
-            // This is a placeholder - in a real implementation, you would:
-            // 1. Use an OCR library like Tesseract to extract text from the converted PNG files
-            // 2. For PDFs, you might also extract text directly using a PDF library
-            // 3. Combine extracted text from all pages for multi-page documents
-            
-            var extractedText = await ExtractTextFromDocumentAsync(processingResult, cancellationToken);
+            var extractedText = processingResult.ExtractedText;
             
             if (string.IsNullOrWhiteSpace(extractedText))
             {
-                _logger?.LogInformation("No text extracted from document {FileName}, skipping AI analysis", fileName);
+                _logger?.LogInformation("No text available for AI analysis for {FileName}", fileName);
                 return;
             }
 
