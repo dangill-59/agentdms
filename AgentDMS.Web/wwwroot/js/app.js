@@ -761,8 +761,27 @@ function createTimingMetrics(result) {
 }
 
 function createAiAnalysisDisplay(aiAnalysis) {
-    if (!aiAnalysis || !aiAnalysis.success) {
+    if (!aiAnalysis) {
         return '';
+    }
+    
+    // Handle failed AI analysis - show error information
+    if (!aiAnalysis.success) {
+        return `
+            <div class="ai-analysis-section mt-3">
+                <h6><i class="bi bi-robot"></i> Mistral AI Analysis</h6>
+                <div class="ai-analysis-content">
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <strong>AI Analysis Failed:</strong> ${aiAnalysis.message || 'Unknown error occurred'}
+                        <div class="small mt-1 text-muted">
+                            OCR text extraction was successful, but AI document analysis encountered an issue. 
+                            This may be due to API configuration, network connectivity, or service availability.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
     }
     
     const confidenceClass = aiAnalysis.confidence >= 0.8 ? 'text-success' : 

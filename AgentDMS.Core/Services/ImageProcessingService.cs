@@ -500,14 +500,15 @@ public class ImageProcessingService
             var aiResult = await _mistralService.AnalyzeDocumentAsync(extractedText, cancellationToken);
             var aiProcessingTime = DateTime.UtcNow - aiStart;
 
+            // Store AI result regardless of success/failure to provide frontend visibility
+            processingResult.AiAnalysis = aiResult;
+            if (processingResult.Metrics != null)
+            {
+                processingResult.Metrics.AiAnalysisTime = aiProcessingTime;
+            }
+
             if (aiResult.Success)
             {
-                processingResult.AiAnalysis = aiResult;
-                if (processingResult.Metrics != null)
-                {
-                    processingResult.Metrics.AiAnalysisTime = aiProcessingTime;
-                }
-
                 _logger?.LogInformation("AI analysis completed for {FileName}. Document type: {DocumentType}, Confidence: {Confidence:F2}", 
                     fileName, aiResult.DocumentType, aiResult.Confidence);
 
@@ -518,11 +519,23 @@ public class ImageProcessingService
             else
             {
                 _logger?.LogWarning("AI analysis failed for {FileName}: {Message}", fileName, aiResult.Message);
+                
+                if (progressReporter != null)
+                    await progressReporter.ReportProgress(fileName, ProgressStatus.ProcessingFile, 
+                        $"AI analysis failed: {aiResult.Message}");
             }
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Error during AI analysis for document");
+            
+            // Store the error result so users can see what happened
+            processingResult.AiAnalysis = DocumentAiResult.Failed($"Analysis error: {ex.Message}");
+            
+            if (progressReporter != null)
+                await progressReporter.ReportProgress(processingResult.ProcessedImage?.FileName ?? "Unknown", 
+                    ProgressStatus.ProcessingFile, $"AI analysis error: {ex.Message}");
+            
             // Don't fail the entire processing pipeline if AI analysis fails
         }
     }
