@@ -22,6 +22,11 @@ public class ProcessingResult
     /// </summary>
     public DocumentAiResult? AiAnalysis { get; set; }
     
+    /// <summary>
+    /// OCR extracted text from the document
+    /// </summary>
+    public string? ExtractedText { get; set; }
+    
     [JsonIgnore]
     public Exception? Error { get; set; }
     

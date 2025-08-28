@@ -677,6 +677,9 @@ function displayProcessingResult(container, result) {
                         <!-- Mistral AI Analysis Results -->
                         ${createAiAnalysisDisplay(result.aiAnalysis)}
                         
+                        <!-- OCR Text Results -->
+                        ${createOcrResultsDisplay(result.extractedText)}
+                        
                         <div class="mt-3">
                             <div class="row">
                                 <div class="col-md-6">
@@ -801,6 +804,52 @@ function createAiAnalysisDisplay(aiAnalysis) {
                         </div>
                     </div>
                 ` : ''}
+            </div>
+        </div>
+    `;
+}
+
+function createOcrResultsDisplay(extractedText) {
+    if (!extractedText || extractedText.trim() === '') {
+        return '';
+    }
+    
+    // Truncate very long text for initial display
+    const maxLength = 300;
+    const isLongText = extractedText.length > maxLength;
+    const truncatedText = isLongText ? extractedText.substring(0, maxLength) + '...' : extractedText;
+    
+    // Create unique ID for this OCR section
+    const ocrId = 'ocr-' + Math.random().toString(36).substr(2, 9);
+    
+    // Store full text in a data attribute for retrieval
+    const fullTextEncoded = encodeURIComponent(extractedText);
+    
+    return `
+        <div class="ocr-results-section mt-3">
+            <h6>
+                <i class="bi bi-text-paragraph"></i> OCR Text Results
+                <button class="btn btn-sm btn-outline-secondary ms-2" type="button" 
+                        onclick="toggleOcrText('${ocrId}')" id="toggle-${ocrId}">
+                    <i class="bi bi-eye"></i> Show Text
+                </button>
+            </h6>
+            <div class="ocr-content" id="${ocrId}" style="display: none;" data-full-text="${fullTextEncoded}">
+                <div class="card border-light">
+                    <div class="card-body">
+                        <div class="ocr-text-preview">
+                            <small class="text-muted">Extracted ${extractedText.length} characters</small>
+                            <pre class="ocr-text mt-2" style="white-space: pre-wrap; font-size: 0.85em; max-height: 200px; overflow-y: auto;">${isLongText ? truncatedText : extractedText}</pre>
+                            ${isLongText ? `
+                                <div class="mt-2">
+                                    <button class="btn btn-sm btn-link p-0" onclick="showFullOcrText('${ocrId}')">
+                                        <i class="bi bi-arrows-expand"></i> Show Full Text
+                                    </button>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     `;
@@ -2024,5 +2073,36 @@ function updateRemoteScanningGuidance() {
         }
     } catch (error) {
         console.warn('Error updating remote scanning guidance:', error);
+    }
+}
+
+// OCR Text Display Functions
+function toggleOcrText(ocrId) {
+    const ocrContent = document.getElementById(ocrId);
+    const toggleBtn = document.getElementById('toggle-' + ocrId);
+    
+    if (ocrContent.style.display === 'none' || ocrContent.style.display === '') {
+        ocrContent.style.display = 'block';
+        toggleBtn.innerHTML = '<i class="bi bi-eye-slash"></i> Hide Text';
+    } else {
+        ocrContent.style.display = 'none';
+        toggleBtn.innerHTML = '<i class="bi bi-eye"></i> Show Text';
+    }
+}
+
+function showFullOcrText(ocrId) {
+    const ocrContent = document.getElementById(ocrId);
+    const ocrTextElement = ocrContent.querySelector('.ocr-text');
+    
+    if (ocrContent && ocrTextElement) {
+        const fullText = decodeURIComponent(ocrContent.dataset.fullText);
+        ocrTextElement.textContent = fullText;
+        ocrTextElement.style.maxHeight = '400px'; // Increase height for full text
+        
+        // Hide the "Show Full Text" button
+        const expandBtn = ocrContent.querySelector('.btn-link');
+        if (expandBtn) {
+            expandBtn.style.display = 'none';
+        }
     }
 }
