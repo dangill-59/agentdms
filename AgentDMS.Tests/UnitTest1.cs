@@ -517,10 +517,13 @@ public class ImageProcessingServiceTests
             Assert.True(resultWithoutMistral.Success, $"Processing without Mistral should succeed: {resultWithoutMistral.Message}");
             Assert.True(resultWithMistral.Success, $"Processing with Mistral should succeed: {resultWithMistral.Message}");
             
-            // Both should not have AI analysis since API key is not configured,
-            // but the flag should be respected internally
+            // Without Mistral AI flag, should not have AI analysis
             Assert.Null(resultWithoutMistral.AiAnalysis);
-            Assert.Null(resultWithMistral.AiAnalysis);
+            
+            // With Mistral AI flag, should have failed AI analysis due to no API key
+            Assert.NotNull(resultWithMistral.AiAnalysis);
+            Assert.False(resultWithMistral.AiAnalysis.Success);
+            Assert.Contains("API key not configured", resultWithMistral.AiAnalysis.Message);
             
             // Verify processing metrics are present in both cases
             Assert.NotNull(resultWithoutMistral.Metrics);
