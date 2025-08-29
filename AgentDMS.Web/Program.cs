@@ -143,6 +143,9 @@ builder.Services.AddSingleton<MistralDocumentAiService>(provider =>
     // Get configuration from the config service
     var config = configService.GetConfigAsync().Result;
     
+    // Configure HttpClient timeout based on configuration
+    httpClient.Timeout = TimeSpan.FromSeconds(config.TimeoutSeconds);
+    
     // Fallback to environment variable if config is empty
     var apiKey = !string.IsNullOrEmpty(config.ApiKey) ? config.ApiKey : Environment.GetEnvironmentVariable("MISTRAL_API_KEY");
     var endpoint = !string.IsNullOrEmpty(config.Endpoint) ? config.Endpoint : "https://api.mistral.ai/v1/chat/completions";
@@ -177,6 +180,9 @@ builder.Services.AddSingleton<MistralOcrService>(provider =>
     {
         return null!;
     }
+    
+    // Configure HttpClient timeout based on configuration
+    httpClient.Timeout = TimeSpan.FromSeconds(config.TimeoutSeconds);
     
     // Fallback to environment variable if config is empty
     var apiKey = !string.IsNullOrEmpty(config.ApiKey) ? config.ApiKey : Environment.GetEnvironmentVariable("MISTRAL_API_KEY");

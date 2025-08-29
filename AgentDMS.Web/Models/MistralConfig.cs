@@ -66,4 +66,13 @@ public class MistralConfig
     [Display(Name = "Include Image Base64")]
     [SwaggerSchema("Include base64 encoded image data in OCR response")]
     public bool IncludeImageBase64 { get; set; } = true;
+    
+    /// <summary>
+    /// HTTP request timeout in seconds for Mistral API calls
+    /// </summary>
+    /// <example>300</example>
+    [Range(30, 1800)]
+    [Display(Name = "Request Timeout (seconds)")]
+    [SwaggerSchema("HTTP request timeout in seconds for Mistral API calls (30-1800 seconds)")]
+    public int TimeoutSeconds { get; set; } = 300;
 }
