@@ -115,64 +115,58 @@ public class MistralDocumentAiService
                 return DocumentAiResult.Failed("API key not configured");
             }
 
-            // Check cache first
+            // Use cache with request deduplication
             var cacheKey = PerformanceCache.GenerateKey(documentText, "ai");
-            var cachedResult = _cache.Get<DocumentAiResult>(cacheKey);
-            if (cachedResult != null)
+            
+            return await _cache.GetOrCreateAsync(cacheKey, async () =>
             {
-                _logger?.LogInformation("Returning cached AI analysis result for text length: {TextLength}", documentText.Length);
-                return cachedResult;
-            }
+                _logger?.LogInformation("Starting Mistral AI document analysis for text length: {TextLength}", documentText.Length);
 
-            _logger?.LogInformation("Starting Mistral AI document analysis for text length: {TextLength}", documentText.Length);
-
-            var prompt = BuildAnalysisPrompt(documentText);
-            var request = new MistralChatRequest
-            {
-                Model = "mistral-large-latest", // Use the latest Mistral model
-                Messages = new List<MistralMessage>
+                var prompt = BuildAnalysisPrompt(documentText);
+                var request = new MistralChatRequest
                 {
-                    new MistralMessage
+                    Model = "mistral-large-latest", // Use the latest Mistral model
+                    Messages = new List<MistralMessage>
                     {
-                        Role = "user",
-                        Content = prompt
-                    }
-                },
-                Temperature = 0.1 // Low temperature for consistent results
-            };
+                        new MistralMessage
+                        {
+                            Role = "user",
+                            Content = prompt
+                        }
+                    },
+                    Temperature = 0.1 // Low temperature for consistent results
+                };
 
-            var requestJson = JsonSerializer.Serialize(request, _jsonOptions);
-            var content = new StringContent(requestJson, Encoding.UTF8, "application/json");
+                var requestJson = JsonSerializer.Serialize(request, _jsonOptions);
+                var content = new StringContent(requestJson, Encoding.UTF8, "application/json");
 
-            var startTime = DateTime.UtcNow;
-            var response = await _httpClient.PostAsync(_endpoint, content, cancellationToken);
-            var processingTime = DateTime.UtcNow - startTime;
+                var startTime = DateTime.UtcNow;
+                var response = await _httpClient.PostAsync(_endpoint, content, cancellationToken);
+                var processingTime = DateTime.UtcNow - startTime;
 
-            if (!response.IsSuccessStatusCode)
-            {
-                var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
-                _logger?.LogError("Mistral API error: {StatusCode} - {Error}", response.StatusCode, errorContent);
-                return DocumentAiResult.Failed($"API error: {response.StatusCode}");
-            }
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                    _logger?.LogError("Mistral API error: {StatusCode} - {Error}", response.StatusCode, errorContent);
+                    return DocumentAiResult.Failed($"API error: {response.StatusCode}");
+                }
 
-            var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
-            var mistralResponse = JsonSerializer.Deserialize<MistralChatResponse>(responseJson, _jsonOptions);
+                var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
+                var mistralResponse = JsonSerializer.Deserialize<MistralChatResponse>(responseJson, _jsonOptions);
 
-            if (mistralResponse?.Choices?.FirstOrDefault()?.Message?.Content == null)
-            {
-                return DocumentAiResult.Failed("Invalid response from Mistral API");
-            }
+                if (mistralResponse?.Choices?.FirstOrDefault()?.Message?.Content == null)
+                {
+                    return DocumentAiResult.Failed("Invalid response from Mistral API");
+                }
 
-            var analysisResult = ParseAnalysisResult(mistralResponse.Choices.First().Message.Content);
-            analysisResult.ProcessingTime = processingTime;
+                var analysisResult = ParseAnalysisResult(mistralResponse.Choices.First().Message.Content);
+                analysisResult.ProcessingTime = processingTime;
 
-            // Cache successful results
-            _cache.Set(cacheKey, analysisResult, TimeSpan.FromHours(2)); // Cache for 2 hours
+                _logger?.LogInformation("Mistral AI analysis completed in {ProcessingTime}ms. Document type: {DocumentType}", 
+                    processingTime.TotalMilliseconds, analysisResult.DocumentType);
 
-            _logger?.LogInformation("Mistral AI analysis completed in {ProcessingTime}ms. Document type: {DocumentType}", 
-                processingTime.TotalMilliseconds, analysisResult.DocumentType);
-
-            return analysisResult;
+                return analysisResult;
+            }, TimeSpan.FromHours(2), cancellationToken);
         }
         catch (Exception ex)
         {

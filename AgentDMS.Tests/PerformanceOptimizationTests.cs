@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -185,10 +186,76 @@ public class PerformanceOptimizationTests
 
         // Assert
         Assert.Equal(2, stats.EntryCount);
+        Assert.Equal(0, stats.InProgressRequestCount);
         Assert.Equal(TimeSpan.FromMinutes(30), stats.DefaultExpiry);
         
         _output.WriteLine($"Cache entries: {stats.EntryCount}");
+        _output.WriteLine($"In-progress requests: {stats.InProgressRequestCount}");
         _output.WriteLine($"Default expiry: {stats.DefaultExpiry}");
+    }
+
+    [Fact]
+    public async Task PerformanceCache_ShouldDeduplicateSimultaneousRequests()
+    {
+        // Arrange
+        var cache = new PerformanceCache();
+        var key = "test-deduplication";
+        var callCount = 0;
+        
+        // Factory function that tracks how many times it's called
+        async Task<OcrResult> Factory()
+        {
+            Interlocked.Increment(ref callCount);
+            await Task.Delay(50); // Simulate API call
+            return new OcrResult { Success = true, Text = $"Result {callCount}" };
+        }
+
+        // Act - Start multiple simultaneous requests for the same key
+        var tasks = new List<Task<OcrResult>>();
+        for (int i = 0; i < 5; i++)
+        {
+            tasks.Add(cache.GetOrCreateAsync(key, Factory));
+        }
+
+        var results = await Task.WhenAll(tasks);
+
+        // Assert
+        Assert.Equal(1, callCount); // Factory should only be called once due to deduplication
+        Assert.All(results, result => Assert.True(result.Success));
+        Assert.All(results, result => Assert.Equal("Result 1", result.Text)); // All should have same result
+        
+        _output.WriteLine($"Factory called {callCount} times for 5 simultaneous requests");
+        _output.WriteLine($"All results identical: {results.All(r => r.Text == results[0].Text)}");
+    }
+
+    [Fact]
+    public async Task PerformanceCache_GetOrCreateAsync_ShouldReturnCachedValue()
+    {
+        // Arrange
+        var cache = new PerformanceCache();
+        var key = "test-cached";
+        var factoryCalled = false;
+        
+        // Pre-populate cache
+        cache.Set(key, new OcrResult { Text = "cached value" });
+        
+        // Factory that shouldn't be called
+        async Task<OcrResult> Factory()
+        {
+            factoryCalled = true;
+            await Task.Delay(10);
+            return new OcrResult { Text = "factory value" };
+        }
+
+        // Act
+        var result = await cache.GetOrCreateAsync(key, Factory);
+
+        // Assert
+        Assert.False(factoryCalled); // Factory should not be called
+        Assert.Equal("cached value", result.Text); // Should return cached value
+        
+        _output.WriteLine($"Factory called: {factoryCalled}");
+        _output.WriteLine($"Result: {result.Text}");
     }
 
     [Fact]
