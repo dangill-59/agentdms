@@ -1,4 +1,5 @@
 using AgentDMS.Core.Services;
+using AgentDMS.Core.Models;
 using AgentDMS.Web.Hubs;
 using AgentDMS.Web.Services;
 using Microsoft.OpenApi.Models;
@@ -118,6 +119,9 @@ builder.Services.AddSingleton<IScannerService, ScannerService>();
 
 // Add Mistral Configuration Service
 builder.Services.AddSingleton<IMistralConfigService, MistralConfigService>();
+
+// Add Project Document Service
+builder.Services.AddSingleton<IProjectDocumentService, InMemoryProjectDocumentService>();
 
 // Add Mistral Document AI Service (optional - only if API key is configured)
 // Configuration example:

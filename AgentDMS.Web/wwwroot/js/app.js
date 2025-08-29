@@ -406,7 +406,7 @@ async function handleUpload(event) {
             result.renderingTime = formatDuration(renderingTime);
             
             // Display results and images
-            displayProcessingResult(resultDiv, result);
+            await displayProcessingResult(resultDiv, result);
             displayImagesInViewer(imageViewer, [result], renderingTime);
         }
         
@@ -653,9 +653,13 @@ async function handleGalleryGeneration(event) {
 }
 
 // Display functions
-function displayProcessingResult(container, result) {
+async function displayProcessingResult(container, result) {
     if (result.success && result.processedImage) {
         const img = result.processedImage;
+        
+        // Create enhanced AI analysis display with project document details
+        const enhancedAiAnalysisHtml = await createEnhancedAiAnalysisDisplay(result.aiAnalysis);
+        
         container.innerHTML = `
             <div class="alert alert-success fade-in">
                 <h6><i class="bi bi-check-circle"></i> Processing Successful!</h6>
@@ -674,8 +678,8 @@ function displayProcessingResult(container, result) {
                         <!-- Detailed Timing Metrics -->
                         ${createTimingMetrics(result)}
                         
-                        <!-- Mistral AI Analysis Results -->
-                        ${createAiAnalysisDisplay(result.aiAnalysis)}
+                        <!-- Enhanced Mistral AI Analysis Results with Project Document Details -->
+                        ${enhancedAiAnalysisHtml}
                         
                         <!-- OCR Text Results -->
                         ${createOcrResultsDisplay(result.extractedText)}
@@ -2124,4 +2128,131 @@ function showFullOcrText(ocrId) {
             expandBtn.style.display = 'none';
         }
     }
+}
+
+// Project Document Management Functions
+
+/**
+ * Fetches project document data from the API
+ * @param {number} projectId - The project ID to fetch document data for
+ * @returns {Promise<Object|null>} The project document data or null if not found
+ */
+async function fetchProjectDocumentData(projectId) {
+    try {
+        const response = await fetch(`/api/projectdocument/project/${projectId}`);
+        
+        if (response.ok) {
+            const documentData = await response.json();
+            console.log(`Project document data retrieved for project ${projectId}:`, documentData);
+            return documentData;
+        } else if (response.status === 404) {
+            console.log(`No document found for project ${projectId}`);
+            return null;
+        } else {
+            console.error(`Error fetching project document data: ${response.status} ${response.statusText}`);
+            return null;
+        }
+    } catch (error) {
+        console.error('Error fetching project document data:', error);
+        return null;
+    }
+}
+
+/**
+ * Creates HTML display for project document details
+ * @param {Object} documentData - The project document data
+ * @returns {string} HTML string for displaying document details
+ */
+function createProjectDocumentDisplay(documentData) {
+    if (!documentData) {
+        return `
+            <div class="document-details-section mt-3">
+                <h6><i class="bi bi-file-text"></i> Document Details</h6>
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i>
+                    No project document data available.
+                </div>
+            </div>
+        `;
+    }
+
+    return `
+        <div class="document-details-section mt-3">
+            <h6><i class="bi bi-file-text"></i> Document Details</h6>
+            <div class="document-details-content">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="document-field">
+                            <strong>Customer Name:</strong>
+                            <span class="ms-1">${documentData.customerName || 'N/A'}</span>
+                        </div>
+                        <div class="document-field">
+                            <strong>Invoice Number:</strong>
+                            <span class="ms-1">${documentData.invoiceNumber || 'N/A'}</span>
+                        </div>
+                        <div class="document-field">
+                            <strong>Invoice Date:</strong>
+                            <span class="ms-1">${documentData.invoiceDate ? new Date(documentData.invoiceDate).toLocaleDateString() : 'N/A'}</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="document-field">
+                            <strong>Document Type:</strong>
+                            <span class="badge bg-secondary ms-1">${documentData.documentType || 'Unknown'}</span>
+                        </div>
+                        <div class="document-field">
+                            <strong>Status:</strong>
+                            <span class="badge ${getStatusBadgeClass(documentData.status)} ms-1">${documentData.status || 'Unknown'}</span>
+                        </div>
+                        ${documentData.notes ? `
+                            <div class="document-field">
+                                <strong>Notes:</strong>
+                                <div class="text-muted small mt-1">${documentData.notes}</div>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Gets the appropriate CSS class for status badges
+ * @param {string} status - The status value
+ * @returns {string} CSS class for the status badge
+ */
+function getStatusBadgeClass(status) {
+    if (!status) return 'bg-secondary';
+    
+    const statusLower = status.toLowerCase();
+    if (statusLower.includes('processed') || statusLower.includes('complete')) {
+        return 'bg-success';
+    } else if (statusLower.includes('pending') || statusLower.includes('review')) {
+        return 'bg-warning';
+    } else if (statusLower.includes('rejected') || statusLower.includes('error')) {
+        return 'bg-danger';
+    } else {
+        return 'bg-info';
+    }
+}
+
+/**
+ * Updates the AI analysis display to include project document details
+ * @param {Object} aiAnalysis - The AI analysis result
+ * @param {number} projectId - The project ID to fetch document details for (defaults to 3 as mentioned in requirements)
+ * @returns {Promise<string>} Enhanced AI analysis display with project document details
+ */
+async function createEnhancedAiAnalysisDisplay(aiAnalysis, projectId = 3) {
+    // Get the original AI analysis display
+    const aiAnalysisHtml = createAiAnalysisDisplay(aiAnalysis);
+    
+    // Fetch project document data
+    const documentData = await fetchProjectDocumentData(projectId);
+    
+    // Create project document display
+    const documentDetailsHtml = createProjectDocumentDisplay(documentData);
+    
+    // Combine both displays
+    return aiAnalysisHtml + documentDetailsHtml;
 }
