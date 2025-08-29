@@ -44,4 +44,26 @@ public class MistralConfig
     [Display(Name = "Temperature")]
     [SwaggerSchema("Temperature for response generation (0.0 = deterministic, 2.0 = very creative)")]
     public double Temperature { get; set; } = 0.1;
+    
+    /// <summary>
+    /// Enable Mistral OCR processing instead of Tesseract
+    /// </summary>
+    [Display(Name = "Enable Mistral OCR")]
+    [SwaggerSchema("Use Mistral OCR API instead of local Tesseract OCR")]
+    public bool EnableOcrProcessing { get; set; } = false;
+    
+    /// <summary>
+    /// Mistral OCR model to use for processing
+    /// </summary>
+    /// <example>mistral-ocr-latest</example>
+    [Display(Name = "OCR Model")]
+    [SwaggerSchema("Mistral OCR model identifier")]
+    public string OcrModel { get; set; } = "mistral-ocr-latest";
+    
+    /// <summary>
+    /// Include base64 image data in OCR response
+    /// </summary>
+    [Display(Name = "Include Image Base64")]
+    [SwaggerSchema("Include base64 encoded image data in OCR response")]
+    public bool IncludeImageBase64 { get; set; } = true;
 }

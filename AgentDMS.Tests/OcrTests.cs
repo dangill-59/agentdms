@@ -26,7 +26,7 @@ public class OcrTests : IDisposable
         Directory.CreateDirectory(_tempDirectory);
 
         // Create service with null logger for tests
-        _service = new ImageProcessingService(maxConcurrency: 1, outputDirectory: _tempDirectory, logger: null, mistralService: null);
+        _service = new ImageProcessingService(maxConcurrency: 1, outputDirectory: _tempDirectory, logger: null, mistralService: null, mistralOcrService: null);
     }
 
     [Fact]

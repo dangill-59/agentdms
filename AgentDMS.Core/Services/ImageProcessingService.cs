@@ -22,17 +22,20 @@ public class ImageProcessingService
     private readonly string _outputDirectory;
     private readonly ILogger<ImageProcessingService>? _logger;
     private readonly MistralDocumentAiService? _mistralService;
+    private readonly MistralOcrService? _mistralOcrService;
 
     public ImageProcessingService(
         int maxConcurrency = 4, 
         string? outputDirectory = null, 
         ILogger<ImageProcessingService>? logger = null,
-        MistralDocumentAiService? mistralService = null)
+        MistralDocumentAiService? mistralService = null,
+        MistralOcrService? mistralOcrService = null)
     {
         _semaphore = new SemaphoreSlim(maxConcurrency);
         _outputDirectory = outputDirectory ?? Path.Combine(Path.GetTempPath(), "AgentDMS_Output");
         _logger = logger;
         _mistralService = mistralService;
+        _mistralOcrService = mistralOcrService;
         
         // Ensure output directory exists
         Directory.CreateDirectory(_outputDirectory);
@@ -44,7 +47,7 @@ public class ImageProcessingService
     /// <summary>
     /// Process a single image file asynchronously
     /// </summary>
-    public async Task<ProcessingResult> ProcessImageAsync(string filePath, DetailedProgressReporter? progressReporter = null, CancellationToken cancellationToken = default, bool useMistralAI = false)
+    public async Task<ProcessingResult> ProcessImageAsync(string filePath, DetailedProgressReporter? progressReporter = null, CancellationToken cancellationToken = default, bool useMistralAI = false, bool useMistralOcr = false)
     {
         await _semaphore.WaitAsync(cancellationToken);
         
@@ -126,7 +129,7 @@ public class ImageProcessingService
                     if (progressReporter != null)
                         await progressReporter.ReportProgress(fileName, ProgressStatus.ProcessingFile, "Extracting text (OCR)...");
                     
-                    var extractedText = await ExtractTextFromDocumentAsync(result, cancellationToken);
+                    var extractedText = await ExtractTextFromDocumentAsync(result, cancellationToken, useMistralOcr);
                     result.ExtractedText = extractedText;
                     
                     if (!string.IsNullOrWhiteSpace(extractedText))
@@ -545,8 +548,104 @@ public class ImageProcessingService
     /// </summary>
     /// <param name="processingResult">The processing result containing processed images</param>
     /// <param name="cancellationToken">Cancellation token</param>
+    /// <param name="useMistralOcr">Whether to use Mistral OCR instead of Tesseract</param>
     /// <returns>Extracted text content</returns>
-    private async Task<string> ExtractTextFromDocumentAsync(ProcessingResult processingResult, CancellationToken cancellationToken)
+    private async Task<string> ExtractTextFromDocumentAsync(ProcessingResult processingResult, CancellationToken cancellationToken, bool useMistralOcr = false)
+    {
+        try
+        {
+            var extractedText = new StringBuilder();
+
+            // Choose OCR method based on configuration and service availability
+            if (useMistralOcr && _mistralOcrService != null)
+            {
+                return await ExtractTextUsingMistralOcrAsync(processingResult, cancellationToken);
+            }
+            else
+            {
+                return await ExtractTextUsingTesseractAsync(processingResult, cancellationToken);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Error extracting text from document using OCR");
+            
+            // Fallback to placeholder text if OCR fails
+            var fileName = processingResult.ProcessedImage?.FileName ?? "Unknown";
+            var extension = processingResult.ProcessedImage?.OriginalFormat?.ToLowerInvariant() ?? "unknown";
+            return $"[OCR_ERROR] Failed to extract text from {extension} file: {fileName}. Error: {ex.Message}";
+        }
+    }
+
+    /// <summary>
+    /// Extracts text using Mistral OCR API
+    /// </summary>
+    /// <param name="processingResult">The processing result containing processed images</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Extracted text content</returns>
+    private async Task<string> ExtractTextUsingMistralOcrAsync(ProcessingResult processingResult, CancellationToken cancellationToken)
+    {
+        var extractedText = new StringBuilder();
+
+        // Process single image or main image
+        if (processingResult.ProcessedImage?.ConvertedPngPath != null)
+        {
+            var ocrResult = await _mistralOcrService!.ProcessDocumentFromFileAsync(
+                processingResult.ProcessedImage.ConvertedPngPath, 
+                cancellationToken: cancellationToken);
+            
+            if (ocrResult.Success && !string.IsNullOrWhiteSpace(ocrResult.Text))
+            {
+                extractedText.AppendLine(ocrResult.Text);
+                _logger?.LogInformation("Mistral OCR extracted {TextLength} characters with confidence {Confidence:P1}", 
+                    ocrResult.Text.Length, ocrResult.Confidence);
+            }
+            else
+            {
+                _logger?.LogWarning("Mistral OCR failed for image: {Error}", ocrResult.Message);
+            }
+        }
+
+        // Process split pages for multi-page documents
+        if (processingResult.SplitPages != null && processingResult.SplitPages.Count > 0)
+        {
+            foreach (var page in processingResult.SplitPages)
+            {
+                if (page.ConvertedPngPath != null)
+                {
+                    var ocrResult = await _mistralOcrService!.ProcessDocumentFromFileAsync(
+                        page.ConvertedPngPath,
+                        cancellationToken: cancellationToken);
+                    
+                    if (ocrResult.Success && !string.IsNullOrWhiteSpace(ocrResult.Text))
+                    {
+                        extractedText.AppendLine($"--- Page {page.FileName} ---");
+                        extractedText.AppendLine(ocrResult.Text);
+                    }
+                }
+            }
+        }
+
+        var result = extractedText.ToString().Trim();
+        
+        // Return a meaningful message if no text was extracted
+        if (string.IsNullOrWhiteSpace(result))
+        {
+            var fileName = processingResult.ProcessedImage?.FileName ?? "Unknown";
+            var extension = processingResult.ProcessedImage?.OriginalFormat?.ToLowerInvariant() ?? "unknown";
+            return $"No text was extracted from {extension} file: {fileName} using Mistral OCR. The document may be an image without readable text.";
+        }
+        
+        return result;
+    }
+
+    /// <summary>
+    /// Extracts text using Tesseract OCR (existing implementation)
+    /// </summary>
+    /// <param name="processingResult">The processing result containing processed images</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Extracted text content</returns>
+    private async Task<string> ExtractTextUsingTesseractAsync(ProcessingResult processingResult, CancellationToken cancellationToken)
     {
         try
         {
@@ -593,7 +692,7 @@ public class ImageProcessingService
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "Error extracting text from document using OCR");
+            _logger?.LogError(ex, "Error extracting text from document using Tesseract OCR");
             
             // Fallback to placeholder text if OCR fails
             var fileName = processingResult.ProcessedImage?.FileName ?? "Unknown";
