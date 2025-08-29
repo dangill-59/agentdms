@@ -32,7 +32,7 @@ public class OcrIntegrationTests : IDisposable
         var testImagePath = Path.Combine(_tempDirectory, "test_white.png");
         await CreateSimpleWhiteImage(testImagePath);
 
-        var service = new ImageProcessingService(maxConcurrency: 1, outputDirectory: _tempDirectory, logger: null, mistralService: null);
+        var service = new ImageProcessingService(maxConcurrency: 1, outputDirectory: _tempDirectory, logger: null, mistralService: null, mistralOcrService: null);
 
         // Act - Process the image which should trigger OCR
         var result = await service.ProcessImageAsync(testImagePath, null, CancellationToken.None, useMistralAI: false);
@@ -57,7 +57,7 @@ public class OcrIntegrationTests : IDisposable
         var testImagePath = Path.Combine(_tempDirectory, "test_text.png");
         await CreateTestImageWithText(testImagePath, "Hello OCR Test");
 
-        var service = new ImageProcessingService(maxConcurrency: 1, outputDirectory: _tempDirectory, logger: null, mistralService: null);
+        var service = new ImageProcessingService(maxConcurrency: 1, outputDirectory: _tempDirectory, logger: null, mistralService: null, mistralOcrService: null);
 
         // Act - Process the image which should trigger OCR
         var result = await service.ProcessImageAsync(testImagePath, null, CancellationToken.None, useMistralAI: false);
