@@ -21,6 +21,7 @@ public class ProcessingJob
     public string JobId { get; set; } = string.Empty;
     public string FilePath { get; set; } = string.Empty;
     public bool UseMistralAI { get; set; } = false;
+    public bool UseMistralOcr { get; set; } = false;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public JobStatus Status { get; set; } = JobStatus.Queued;
     public string? ErrorMessage { get; set; }
@@ -43,7 +44,7 @@ public enum JobStatus
 /// </summary>
 public interface IBackgroundJobService
 {
-    Task<string> EnqueueJobAsync(string filePath, bool useMistralAI = false);
+    Task<string> EnqueueJobAsync(string filePath, bool useMistralAI = false, bool useMistralOcr = false);
     Task<ProcessingJob?> GetJobStatusAsync(string jobId);
     Task<ProcessingResult?> GetJobResultAsync(string jobId);
 }
@@ -70,7 +71,7 @@ public class BackgroundJobService : BackgroundService, IBackgroundJobService
         _logger = logger;
     }
 
-    public Task<string> EnqueueJobAsync(string filePath, bool useMistralAI = false)
+    public Task<string> EnqueueJobAsync(string filePath, bool useMistralAI = false, bool useMistralOcr = false)
     {
         var jobId = Guid.NewGuid().ToString();
         var job = new ProcessingJob
@@ -78,6 +79,7 @@ public class BackgroundJobService : BackgroundService, IBackgroundJobService
             JobId = jobId,
             FilePath = filePath,
             UseMistralAI = useMistralAI,
+            UseMistralOcr = useMistralOcr,
             CreatedAt = DateTime.UtcNow,
             Status = JobStatus.Queued
         };
@@ -86,7 +88,8 @@ public class BackgroundJobService : BackgroundService, IBackgroundJobService
         _jobQueue.Enqueue(job);
         _queueSemaphore.Release();
 
-        _logger.LogInformation("Enqueued job {JobId} for file {FilePath} with Mistral AI: {UseMistralAI}", jobId, filePath, useMistralAI);
+        _logger.LogInformation("Enqueued job {JobId} for file {FilePath} with Mistral AI: {UseMistralAI}, Mistral OCR: {UseMistralOcr}", 
+            jobId, filePath, useMistralAI, useMistralOcr);
         return Task.FromResult(jobId);
     }
 
@@ -133,7 +136,7 @@ public class BackgroundJobService : BackgroundService, IBackgroundJobService
             });
 
             // Process the image
-            var result = await _imageProcessingService.ProcessImageAsync(job.FilePath, progressReporter, cancellationToken, job.UseMistralAI);
+            var result = await _imageProcessingService.ProcessImageAsync(job.FilePath, progressReporter, cancellationToken, job.UseMistralAI, job.UseMistralOcr);
 
             job.Result = result;
             job.Status = result.Success ? JobStatus.Completed : JobStatus.Failed;
