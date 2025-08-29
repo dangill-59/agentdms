@@ -160,17 +160,52 @@ builder.Services.AddSingleton<MistralDocumentAiService>(provider =>
     return service;
 });
 
-// Update ImageProcessingService registration to include MistralDocumentAiService
+// Add Mistral OCR Service (optional - only if API key is configured and OCR is enabled)
+builder.Services.AddHttpClient<MistralOcrService>();
+builder.Services.AddSingleton<MistralOcrService>(provider =>
+{
+    var httpClientFactory = provider.GetRequiredService<IHttpClientFactory>();
+    var httpClient = httpClientFactory.CreateClient(nameof(MistralOcrService));
+    var logger = provider.GetService<ILogger<MistralOcrService>>();
+    var configService = provider.GetRequiredService<IMistralConfigService>();
+    
+    // Get configuration from the config service
+    var config = configService.GetConfigAsync().Result;
+    
+    // Only create the service if OCR processing is enabled
+    if (!config.EnableOcrProcessing)
+    {
+        return null!;
+    }
+    
+    // Fallback to environment variable if config is empty
+    var apiKey = !string.IsNullOrEmpty(config.ApiKey) ? config.ApiKey : Environment.GetEnvironmentVariable("MISTRAL_API_KEY");
+    var endpoint = "https://api.mistral.ai/v1/ocr/process"; // OCR-specific endpoint
+    
+    var service = new MistralOcrService(httpClient, apiKey, endpoint, logger);
+    
+    // Subscribe to configuration changes
+    configService.ConfigChanged += (sender, newConfig) =>
+    {
+        logger?.LogInformation("Mistral OCR configuration changed. Restart the application to apply new settings.");
+    };
+    
+    return service;
+});
+
+// Update ImageProcessingService registration to include MistralDocumentAiService and MistralOcrService
 builder.Services.AddSingleton<ImageProcessingService>(provider =>
 {
     var logger = provider.GetService<ILogger<ImageProcessingService>>();
     var mistralService = provider.GetService<MistralDocumentAiService>();
+    var mistralOcrService = provider.GetService<MistralOcrService>();
     
     return new ImageProcessingService(
         maxConcurrency: 4, 
         outputDirectory: null, 
         logger: logger, 
-        mistralService: mistralService);
+        mistralService: mistralService,
+        mistralOcrService: mistralOcrService);
 });
 
 // Configure CORS to allow all origins for development (updated for SignalR)

@@ -86,12 +86,14 @@ public class ImageProcessingController : ControllerBase
     public async Task<ActionResult<UploadResponse>> UploadAndProcessImage(
         [SwaggerParameter("Image file to upload")] IFormFile file)
     {
-        // Manually read the useMistralAI parameter from form data to avoid model binding issues
+        // Manually read the useMistralAI and useMistralOcr parameters from form data to avoid model binding issues
         var useMistralAIValue = Request.Form["useMistralAI"].ToString();
+        var useMistralOcrValue = Request.Form["useMistralOcr"].ToString();
         bool useMistralAiBool = useMistralAIValue?.ToLowerInvariant() == "true";
+        bool useMistralOcrBool = useMistralOcrValue?.ToLowerInvariant() == "true";
         
-        _logger.LogInformation("Upload request received. File: {FileName}, UseMistralAI: {UseMistralAI}", 
-            file?.FileName ?? "null", useMistralAiBool);
+        _logger.LogInformation("Upload request received. File: {FileName}, UseMistralAI: {UseMistralAI}, UseMistralOcr: {UseMistralOcr}", 
+            file?.FileName ?? "null", useMistralAiBool, useMistralOcrBool);
         
         if (file == null || file.Length == 0)
         {
@@ -112,7 +114,7 @@ public class ImageProcessingController : ControllerBase
             }
 
             // Enqueue job for background processing
-            var jobId = await _backgroundJobService.EnqueueJobAsync(tempFilePath, useMistralAiBool);
+            var jobId = await _backgroundJobService.EnqueueJobAsync(tempFilePath, useMistralAiBool, useMistralOcrBool);
 
             _logger.LogInformation("File uploaded successfully. Job ID: {JobId}, File: {FileName}", jobId, file.FileName);
 
@@ -384,7 +386,7 @@ public class ImageProcessingController : ControllerBase
                 await _progressBroadcaster.BroadcastProgress(jobId, progress);
             });
 
-            var result = await _imageProcessor.ProcessImageAsync(request.FilePath, progressReporter, CancellationToken.None, request.UseMistralAI);
+            var result = await _imageProcessor.ProcessImageAsync(request.FilePath, progressReporter, CancellationToken.None, request.UseMistralAI, request.UseMistralOcr);
             
             return Ok(new { jobId, result });
         }
@@ -797,6 +799,13 @@ public class ProcessImageRequest
     /// <example>true</example>
     [SwaggerSchema("Whether to process with Mistral AI")]
     public bool UseMistralAI { get; set; } = false;
+    
+    /// <summary>
+    /// Whether to use Mistral OCR instead of Tesseract for text extraction
+    /// </summary>
+    /// <example>false</example>
+    [SwaggerSchema("Whether to use Mistral OCR instead of Tesseract")]
+    public bool UseMistralOcr { get; set; } = false;
 }
 
 /// <summary>
