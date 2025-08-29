@@ -33,7 +33,7 @@ public class MistralConfig
     /// <example>mistral-small</example>
     [Required]
     [Display(Name = "Model")]
-    [SwaggerSchema("Mistral model identifier (e.g., mistral-small, mistral-medium, mistral-large, mistral-ocr)")]
+    [SwaggerSchema("Mistral model identifier (e.g., mistral-small, mistral-medium, mistral-large)")]
     public string Model { get; set; } = "mistral-small";
     
     /// <summary>
