@@ -108,62 +108,56 @@ public class MistralOcrService
                 return OcrResult.Failed("API key not configured");
             }
 
-            // Check cache first (combine document data and model for cache key)
+            // Use cache with request deduplication
             var cacheKey = PerformanceCache.GenerateKey($"{documentData}:{model}:{includeImageBase64}", "ocr");
-            var cachedResult = _cache.Get<OcrResult>(cacheKey);
-            if (cachedResult != null)
+            
+            return await _cache.GetOrCreateAsync(cacheKey, async () =>
             {
-                _logger?.LogInformation("Returning cached OCR result for model: {Model}", model);
-                return cachedResult;
-            }
+                _logger?.LogInformation("Starting Mistral OCR processing with model: {Model}", model);
 
-            _logger?.LogInformation("Starting Mistral OCR processing with model: {Model}", model);
+                var request = new MistralOcrRequest
+                {
+                    Model = model,
+                    Document = documentData,
+                    IncludeImageBase64 = includeImageBase64
+                };
 
-            var request = new MistralOcrRequest
-            {
-                Model = model,
-                Document = documentData,
-                IncludeImageBase64 = includeImageBase64
-            };
+                var requestJson = JsonSerializer.Serialize(request, _jsonOptions);
+                var content = new StringContent(requestJson, Encoding.UTF8, "application/json");
 
-            var requestJson = JsonSerializer.Serialize(request, _jsonOptions);
-            var content = new StringContent(requestJson, Encoding.UTF8, "application/json");
+                var startTime = DateTime.UtcNow;
+                var response = await _httpClient.PostAsync(_endpoint, content, cancellationToken);
+                var processingTime = DateTime.UtcNow - startTime;
 
-            var startTime = DateTime.UtcNow;
-            var response = await _httpClient.PostAsync(_endpoint, content, cancellationToken);
-            var processingTime = DateTime.UtcNow - startTime;
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                    _logger?.LogError("Mistral OCR API error: {StatusCode} - {Error}", response.StatusCode, errorContent);
+                    return OcrResult.Failed($"API error: {response.StatusCode}");
+                }
 
-            if (!response.IsSuccessStatusCode)
-            {
-                var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
-                _logger?.LogError("Mistral OCR API error: {StatusCode} - {Error}", response.StatusCode, errorContent);
-                return OcrResult.Failed($"API error: {response.StatusCode}");
-            }
+                var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
+                var ocrResponse = JsonSerializer.Deserialize<MistralOcrResponse>(responseJson, _jsonOptions);
 
-            var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
-            var ocrResponse = JsonSerializer.Deserialize<MistralOcrResponse>(responseJson, _jsonOptions);
+                if (ocrResponse?.Text == null)
+                {
+                    return OcrResult.Failed("Invalid response from Mistral OCR API");
+                }
 
-            if (ocrResponse?.Text == null)
-            {
-                return OcrResult.Failed("Invalid response from Mistral OCR API");
-            }
+                var result = new OcrResult
+                {
+                    Success = true,
+                    Text = ocrResponse.Text,
+                    Confidence = ocrResponse.Confidence,
+                    ProcessingTime = processingTime,
+                    ImageBase64 = ocrResponse.ImageBase64
+                };
 
-            var result = new OcrResult
-            {
-                Success = true,
-                Text = ocrResponse.Text,
-                Confidence = ocrResponse.Confidence,
-                ProcessingTime = processingTime,
-                ImageBase64 = ocrResponse.ImageBase64
-            };
+                _logger?.LogInformation("Mistral OCR processing completed in {ProcessingTime}ms. Extracted {TextLength} characters", 
+                    processingTime.TotalMilliseconds, result.Text.Length);
 
-            // Cache successful results
-            _cache.Set(cacheKey, result, TimeSpan.FromHours(1)); // Cache for 1 hour
-
-            _logger?.LogInformation("Mistral OCR processing completed in {ProcessingTime}ms. Extracted {TextLength} characters", 
-                processingTime.TotalMilliseconds, result.Text.Length);
-
-            return result;
+                return result;
+            }, TimeSpan.FromHours(1), cancellationToken);
         }
         catch (Exception ex)
         {
