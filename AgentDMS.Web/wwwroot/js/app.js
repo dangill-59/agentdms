@@ -370,6 +370,10 @@ async function handleUpload(event) {
         const useMistralAI = document.getElementById('useMistralAI').checked;
         formData.append('useMistralAI', useMistralAI.toString());
         
+        // Add Mistral OCR flag
+        const useMistralOcr = document.getElementById('useMistralOcr').checked;
+        formData.append('useMistralOcr', useMistralOcr.toString());
+        
         const response = await fetch('/api/imageprocessing/upload', {
             method: 'POST',
             body: formData
