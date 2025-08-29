@@ -40,6 +40,7 @@ public class MistralOcrService
     private readonly string _endpoint;
     private readonly ILogger<MistralOcrService>? _logger;
     private readonly JsonSerializerOptions _jsonOptions;
+    private readonly PerformanceCache _cache;
 
     /// <summary>
     /// Initializes a new instance of the MistralOcrService
@@ -48,16 +49,19 @@ public class MistralOcrService
     /// <param name="apiKey">Mistral API key (can be null if provided via environment variable)</param>
     /// <param name="endpoint">API endpoint URL (optional, uses default if not provided)</param>
     /// <param name="logger">Logger instance (optional)</param>
+    /// <param name="cache">Performance cache instance (optional, creates new if not provided)</param>
     public MistralOcrService(
         HttpClient httpClient,
         string? apiKey = null,
         string? endpoint = null,
-        ILogger<MistralOcrService>? logger = null)
+        ILogger<MistralOcrService>? logger = null,
+        PerformanceCache? cache = null)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _apiKey = apiKey ?? Environment.GetEnvironmentVariable("MISTRAL_API_KEY");
         _endpoint = endpoint ?? "https://api.mistral.ai/v1/ocr/process";
         _logger = logger;
+        _cache = cache ?? new PerformanceCache(logger);
         
         _jsonOptions = new JsonSerializerOptions
         {
@@ -65,12 +69,16 @@ public class MistralOcrService
             WriteIndented = false
         };
 
-        // Configure HttpClient if API key is available
+        // Configure HttpClient for optimal performance
         if (!string.IsNullOrEmpty(_apiKey))
         {
             _httpClient.DefaultRequestHeaders.Authorization = 
                 new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _apiKey);
         }
+        
+        // Optimize HTTP client for performance
+        _httpClient.Timeout = TimeSpan.FromMinutes(2); // Set reasonable timeout
+        _httpClient.DefaultRequestHeaders.ConnectionClose = false; // Keep connection alive for reuse
     }
 
     /// <summary>
@@ -84,7 +92,7 @@ public class MistralOcrService
     public async Task<OcrResult> ProcessDocumentAsync(
         string documentData, 
         string model = "mistral-ocr-latest",
-        bool includeImageBase64 = true,
+        bool includeImageBase64 = false,
         CancellationToken cancellationToken = default)
     {
         try
@@ -98,6 +106,15 @@ public class MistralOcrService
             {
                 _logger?.LogWarning("Mistral API key not configured. Skipping OCR processing.");
                 return OcrResult.Failed("API key not configured");
+            }
+
+            // Check cache first (combine document data and model for cache key)
+            var cacheKey = PerformanceCache.GenerateKey($"{documentData}:{model}:{includeImageBase64}", "ocr");
+            var cachedResult = _cache.Get<OcrResult>(cacheKey);
+            if (cachedResult != null)
+            {
+                _logger?.LogInformation("Returning cached OCR result for model: {Model}", model);
+                return cachedResult;
             }
 
             _logger?.LogInformation("Starting Mistral OCR processing with model: {Model}", model);
@@ -140,6 +157,9 @@ public class MistralOcrService
                 ImageBase64 = ocrResponse.ImageBase64
             };
 
+            // Cache successful results
+            _cache.Set(cacheKey, result, TimeSpan.FromHours(1)); // Cache for 1 hour
+
             _logger?.LogInformation("Mistral OCR processing completed in {ProcessingTime}ms. Extracted {TextLength} characters", 
                 processingTime.TotalMilliseconds, result.Text.Length);
 
@@ -163,7 +183,7 @@ public class MistralOcrService
     public async Task<OcrResult> ProcessDocumentFromFileAsync(
         string filePath,
         string model = "mistral-ocr-latest", 
-        bool includeImageBase64 = true,
+        bool includeImageBase64 = false,
         CancellationToken cancellationToken = default)
     {
         try

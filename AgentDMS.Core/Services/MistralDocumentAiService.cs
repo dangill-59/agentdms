@@ -53,6 +53,7 @@ public class MistralDocumentAiService
     private readonly string _endpoint;
     private readonly ILogger<MistralDocumentAiService>? _logger;
     private readonly JsonSerializerOptions _jsonOptions;
+    private readonly PerformanceCache _cache;
 
     /// <summary>
     /// Initializes a new instance of the MistralDocumentAiService
@@ -61,16 +62,19 @@ public class MistralDocumentAiService
     /// <param name="apiKey">Mistral API key (can be null if provided via environment variable)</param>
     /// <param name="endpoint">API endpoint URL (optional, uses default if not provided)</param>
     /// <param name="logger">Logger instance (optional)</param>
+    /// <param name="cache">Performance cache instance (optional, creates new if not provided)</param>
     public MistralDocumentAiService(
         HttpClient httpClient,
         string? apiKey = null,
         string? endpoint = null,
-        ILogger<MistralDocumentAiService>? logger = null)
+        ILogger<MistralDocumentAiService>? logger = null,
+        PerformanceCache? cache = null)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _apiKey = apiKey ?? Environment.GetEnvironmentVariable("MISTRAL_API_KEY");
         _endpoint = endpoint ?? "https://api.mistral.ai/v1/chat/completions";
         _logger = logger;
+        _cache = cache ?? new PerformanceCache(logger);
         
         _jsonOptions = new JsonSerializerOptions
         {
@@ -78,12 +82,16 @@ public class MistralDocumentAiService
             WriteIndented = false
         };
 
-        // Configure HttpClient if API key is available
+        // Configure HttpClient for optimal performance
         if (!string.IsNullOrEmpty(_apiKey))
         {
             _httpClient.DefaultRequestHeaders.Authorization = 
                 new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _apiKey);
         }
+        
+        // Optimize HTTP client for performance
+        _httpClient.Timeout = TimeSpan.FromMinutes(2); // Set reasonable timeout
+        _httpClient.DefaultRequestHeaders.ConnectionClose = false; // Keep connection alive for reuse
     }
 
     /// <summary>
@@ -105,6 +113,15 @@ public class MistralDocumentAiService
             {
                 _logger?.LogWarning("Mistral API key not configured. Skipping AI analysis.");
                 return DocumentAiResult.Failed("API key not configured");
+            }
+
+            // Check cache first
+            var cacheKey = PerformanceCache.GenerateKey(documentText, "ai");
+            var cachedResult = _cache.Get<DocumentAiResult>(cacheKey);
+            if (cachedResult != null)
+            {
+                _logger?.LogInformation("Returning cached AI analysis result for text length: {TextLength}", documentText.Length);
+                return cachedResult;
             }
 
             _logger?.LogInformation("Starting Mistral AI document analysis for text length: {TextLength}", documentText.Length);
@@ -148,6 +165,9 @@ public class MistralDocumentAiService
 
             var analysisResult = ParseAnalysisResult(mistralResponse.Choices.First().Message.Content);
             analysisResult.ProcessingTime = processingTime;
+
+            // Cache successful results
+            _cache.Set(cacheKey, analysisResult, TimeSpan.FromHours(2)); // Cache for 2 hours
 
             _logger?.LogInformation("Mistral AI analysis completed in {ProcessingTime}ms. Document type: {DocumentType}", 
                 processingTime.TotalMilliseconds, analysisResult.DocumentType);
