@@ -217,6 +217,7 @@ AgentDMS includes optional integration with Mistral LLM for document classificat
 - `mistral-small`: Fast and efficient for basic tasks
 - `mistral-medium`: Balanced performance and capability  
 - `mistral-large`: Most capable model for complex analysis
+- `mistral-ocr`: Specialized model for optical character recognition and document processing
 - `open-mistral-7b`: Open-source 7B parameter model
 - `open-mixtral-8x7b`: Open-source mixture of experts model
 - `open-mixtral-8x22b`: Large open-source mixture of experts model
