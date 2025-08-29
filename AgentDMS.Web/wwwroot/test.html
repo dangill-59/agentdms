@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Document Details Display</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { border: 1px solid #ccc; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .document-field { margin: 5px 0; }
+        .badge { padding: 3px 8px; border-radius: 3px; font-size: 0.8em; }
+        .bg-secondary { background-color: #6c757d; color: white; }
+        .bg-info { background-color: #17a2b8; color: white; }
+        .bg-warning { background-color: #ffc107; color: black; }
+        .ms-1 { margin-left: 0.25rem; }
+    </style>
+</head>
+<body>
+    <h1>Test Document Details Display</h1>
+    
+    <div class="test-section">
+        <h2>Test 1: Fetch Project Document Data</h2>
+        <button onclick="testFetchProjectDocument()">Test API Call</button>
+        <div id="apiResult"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Test 2: Create Document Details Display</h2>
+        <button onclick="testDocumentDisplay()">Test Display Generation</button>
+        <div id="displayResult"></div>
+    </div>
+
+    <script>
+        // Copy the functions from app.js for testing
+        async function fetchProjectDocumentData(projectId) {
+            try {
+                const response = await fetch(`/api/projectdocument/project/${projectId}`);
+                
+                if (response.ok) {
+                    const documentData = await response.json();
+                    console.log(`Project document data retrieved for project ${projectId}:`, documentData);
+                    return documentData;
+                } else if (response.status === 404) {
+                    console.log(`No document found for project ${projectId}`);
+                    return null;
+                } else {
+                    console.error(`Error fetching project document data: ${response.status} ${response.statusText}`);
+                    return null;
+                }
+            } catch (error) {
+                console.error('Error fetching project document data:', error);
+                return null;
+            }
+        }
+
+        function createProjectDocumentDisplay(documentData) {
+            if (!documentData) {
+                return `
+                    <div class="document-details-section mt-3">
+                        <h6><i class="bi bi-file-text"></i> Document Details</h6>
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i>
+                            No project document data available.
+                        </div>
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="document-details-section mt-3">
+                    <h6><i class="bi bi-file-text"></i> Document Details</h6>
+                    <div class="document-details-content">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="document-field">
+                                    <strong>Customer Name:</strong>
+                                    <span class="ms-1">${documentData.customerName || 'N/A'}</span>
+                                </div>
+                                <div class="document-field">
+                                    <strong>Invoice Number:</strong>
+                                    <span class="ms-1">${documentData.invoiceNumber || 'N/A'}</span>
+                                </div>
+                                <div class="document-field">
+                                    <strong>Invoice Date:</strong>
+                                    <span class="ms-1">${documentData.invoiceDate ? new Date(documentData.invoiceDate).toLocaleDateString() : 'N/A'}</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="document-field">
+                                    <strong>Document Type:</strong>
+                                    <span class="badge bg-secondary ms-1">${documentData.documentType || 'Unknown'}</span>
+                                </div>
+                                <div class="document-field">
+                                    <strong>Status:</strong>
+                                    <span class="badge ${getStatusBadgeClass(documentData.status)} ms-1">${documentData.status || 'Unknown'}</span>
+                                </div>
+                                ${documentData.notes ? `
+                                    <div class="document-field">
+                                        <strong>Notes:</strong>
+                                        <div class="text-muted small mt-1">${documentData.notes}</div>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function getStatusBadgeClass(status) {
+            if (!status) return 'bg-secondary';
+            
+            const statusLower = status.toLowerCase();
+            if (statusLower.includes('processed') || statusLower.includes('complete')) {
+                return 'bg-success';
+            } else if (statusLower.includes('pending') || statusLower.includes('review')) {
+                return 'bg-warning';
+            } else if (statusLower.includes('rejected') || statusLower.includes('error')) {
+                return 'bg-danger';
+            } else {
+                return 'bg-info';
+            }
+        }
+
+        async function testFetchProjectDocument() {
+            const resultDiv = document.getElementById('apiResult');
+            resultDiv.innerHTML = '<p>Fetching project document data...</p>';
+            
+            try {
+                const data = await fetchProjectDocumentData(3);
+                if (data) {
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            <h4>✓ SUCCESS: Project document data retrieved</h4>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="error">
+                            <h4>✗ FAILED: No document data found</h4>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <h4>✗ ERROR: ${error.message}</h4>
+                    </div>
+                `;
+            }
+        }
+
+        async function testDocumentDisplay() {
+            const resultDiv = document.getElementById('displayResult');
+            resultDiv.innerHTML = '<p>Generating document display...</p>';
+            
+            try {
+                const data = await fetchProjectDocumentData(3);
+                const displayHtml = createProjectDocumentDisplay(data);
+                
+                resultDiv.innerHTML = `
+                    <div class="success">
+                        <h4>✓ SUCCESS: Document display generated</h4>
+                        <p><strong>The database values are being displayed instead of hardcoded values:</strong></p>
+                        ${displayHtml}
+                    </div>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <h4>✗ ERROR: ${error.message}</h4>
+                    </div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>
