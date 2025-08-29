@@ -23,19 +23,22 @@ public class ImageProcessingService
     private readonly ILogger<ImageProcessingService>? _logger;
     private readonly MistralDocumentAiService? _mistralService;
     private readonly MistralOcrService? _mistralOcrService;
+    private readonly PerformanceCache _cache;
 
     public ImageProcessingService(
         int maxConcurrency = 4, 
         string? outputDirectory = null, 
         ILogger<ImageProcessingService>? logger = null,
         MistralDocumentAiService? mistralService = null,
-        MistralOcrService? mistralOcrService = null)
+        MistralOcrService? mistralOcrService = null,
+        PerformanceCache? cache = null)
     {
         _semaphore = new SemaphoreSlim(maxConcurrency);
         _outputDirectory = outputDirectory ?? Path.Combine(Path.GetTempPath(), "AgentDMS_Output");
         _logger = logger;
         _mistralService = mistralService;
         _mistralOcrService = mistralOcrService;
+        _cache = cache ?? new PerformanceCache(logger);
         
         // Ensure output directory exists
         Directory.CreateDirectory(_outputDirectory);
@@ -123,32 +126,8 @@ public class ImageProcessingService
                 metrics.TotalProcessingTime = totalTime;
                 result.Metrics = metrics;
                 
-                // Always extract OCR text for UI display
-                try
-                {
-                    if (progressReporter != null)
-                        await progressReporter.ReportProgress(fileName, ProgressStatus.ProcessingFile, "Extracting text (OCR)...");
-                    
-                    var extractedText = await ExtractTextFromDocumentAsync(result, cancellationToken, useMistralOcr);
-                    result.ExtractedText = extractedText;
-                    
-                    if (!string.IsNullOrWhiteSpace(extractedText))
-                    {
-                        _logger?.LogInformation("Extracted {TextLength} characters of text from {FileName}", 
-                            extractedText.Length, fileName);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogWarning(ex, "OCR text extraction failed for {FileName}", fileName);
-                    // Don't fail the entire processing pipeline if OCR fails
-                }
-                
-                // Perform AI analysis if Mistral service is available and user requested it
-                if (_mistralService != null && useMistralAI)
-                {
-                    await PerformAiAnalysisAsync(result, progressReporter, cancellationToken);
-                }
+                // Optimize OCR and AI processing based on configuration
+                await OptimizeTextExtractionAndAnalysisAsync(result, progressReporter, cancellationToken, useMistralOcr, useMistralAI, fileName);
                 
                 if (progressReporter != null)
                     await progressReporter.ReportProgress(fileName, ProgressStatus.Completed, "Processing completed successfully");
@@ -771,6 +750,113 @@ public class ImageProcessingService
         else
         {
             return ((int)(maxSize * aspectRatio), maxSize);
+        }
+    }
+
+    /// <summary>
+    /// Optimized text extraction and AI analysis that can run operations in parallel when possible
+    /// </summary>
+    private async Task OptimizeTextExtractionAndAnalysisAsync(
+        ProcessingResult result, 
+        DetailedProgressReporter? progressReporter, 
+        CancellationToken cancellationToken, 
+        bool useMistralOcr, 
+        bool useMistralAI, 
+        string fileName)
+    {
+        // Scenario 1: Both OCR and AI analysis needed with Mistral OCR
+        // We can do OCR and let AI analysis wait for the text
+        if (useMistralOcr && useMistralAI && _mistralOcrService != null && _mistralService != null)
+        {
+            try
+            {
+                if (progressReporter != null)
+                    await progressReporter.ReportProgress(fileName, ProgressStatus.ProcessingFile, "Extracting text and analyzing document...");
+
+                // Do OCR first, then AI analysis (sequential for now since AI needs OCR text)
+                var extractedText = await ExtractTextFromDocumentAsync(result, cancellationToken, useMistralOcr);
+                result.ExtractedText = extractedText;
+
+                if (!string.IsNullOrWhiteSpace(extractedText))
+                {
+                    _logger?.LogInformation("Extracted {TextLength} characters of text from {FileName}", 
+                        extractedText.Length, fileName);
+
+                    // Now do AI analysis with the extracted text
+                    await PerformAiAnalysisAsync(result, progressReporter, cancellationToken);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Optimized processing failed for {FileName}, falling back to individual operations", fileName);
+                await FallbackToSequentialProcessing(result, progressReporter, cancellationToken, useMistralOcr, useMistralAI, fileName);
+            }
+        }
+        // Scenario 2: Only OCR needed
+        else if (!useMistralAI)
+        {
+            try
+            {
+                if (progressReporter != null)
+                    await progressReporter.ReportProgress(fileName, ProgressStatus.ProcessingFile, "Extracting text (OCR)...");
+                
+                var extractedText = await ExtractTextFromDocumentAsync(result, cancellationToken, useMistralOcr);
+                result.ExtractedText = extractedText;
+                
+                if (!string.IsNullOrWhiteSpace(extractedText))
+                {
+                    _logger?.LogInformation("Extracted {TextLength} characters of text from {FileName}", 
+                        extractedText.Length, fileName);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "OCR text extraction failed for {FileName}", fileName);
+            }
+        }
+        // Scenario 3: Both needed but with traditional OCR (we could potentially parallelize if we had cached text)
+        else
+        {
+            await FallbackToSequentialProcessing(result, progressReporter, cancellationToken, useMistralOcr, useMistralAI, fileName);
+        }
+    }
+
+    /// <summary>
+    /// Fallback to original sequential processing
+    /// </summary>
+    private async Task FallbackToSequentialProcessing(
+        ProcessingResult result, 
+        DetailedProgressReporter? progressReporter, 
+        CancellationToken cancellationToken, 
+        bool useMistralOcr, 
+        bool useMistralAI, 
+        string fileName)
+    {
+        // Always extract OCR text for UI display
+        try
+        {
+            if (progressReporter != null)
+                await progressReporter.ReportProgress(fileName, ProgressStatus.ProcessingFile, "Extracting text (OCR)...");
+            
+            var extractedText = await ExtractTextFromDocumentAsync(result, cancellationToken, useMistralOcr);
+            result.ExtractedText = extractedText;
+            
+            if (!string.IsNullOrWhiteSpace(extractedText))
+            {
+                _logger?.LogInformation("Extracted {TextLength} characters of text from {FileName}", 
+                    extractedText.Length, fileName);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "OCR text extraction failed for {FileName}", fileName);
+            // Don't fail the entire processing pipeline if OCR fails
+        }
+        
+        // Perform AI analysis if Mistral service is available and user requested it
+        if (_mistralService != null && useMistralAI)
+        {
+            await PerformAiAnalysisAsync(result, progressReporter, cancellationToken);
         }
     }
 
