@@ -14,13 +14,44 @@ namespace AgentDMS.Core.Utilities;
 public static class ThumbnailGenerator
 {
     /// <summary>
-    /// Convert an image file to PNG format directly without thumbnail generation
+    /// Generate a unique filename to avoid conflicts with existing files
     /// </summary>
-    /// <param name="inputPath">Path to the input image file</param>
-    /// <param name="outputDirectory">Output directory for the PNG file</param>
+    /// <param name="baseFilePath">The desired file path</param>
+    /// <returns>A unique file path that doesn't conflict with existing files</returns>
+    private static string GetUniqueFilePath(string baseFilePath)
+    {
+        if (!File.Exists(baseFilePath))
+        {
+            return baseFilePath;
+        }
+
+        var directory = Path.GetDirectoryName(baseFilePath) ?? "";
+        var fileName = Path.GetFileNameWithoutExtension(baseFilePath);
+        var extension = Path.GetExtension(baseFilePath);
+        
+        int counter = 1;
+        string uniquePath;
+        
+        do
+        {
+            uniquePath = Path.Combine(directory, $"{fileName}_web_{counter}{extension}");
+            counter++;
+        }
+        while (File.Exists(uniquePath));
+        
+        return uniquePath;
+    }
+
+    /// <summary>
+    /// Convert an image file to PNG format for web-friendly viewing.
+    /// Original files are preserved completely untouched in their original format and location.
+    /// PNG copies are created in the output directory for web viewing purposes.
+    /// </summary>
+    /// <param name="inputPath">Path to the input image file (will never be modified)</param>
+    /// <param name="outputDirectory">Output directory for the web-friendly PNG copy</param>
     /// <param name="customName">Custom name for the PNG file</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Path to the converted PNG file</returns>
+    /// <returns>Path to the web-friendly PNG copy</returns>
     public static async Task<string> ConvertToPngAsync(
         string inputPath, 
         string outputDirectory,
@@ -36,18 +67,19 @@ public static class ThumbnailGenerator
 
         var fileName = customName ?? Path.GetFileNameWithoutExtension(inputPath);
         var pngPath = Path.Combine(outputDirectory, $"{fileName}.png");
+        
+        // Generate a unique filename to avoid overwriting existing files
+        pngPath = GetUniqueFilePath(pngPath);
 
-        // If input is already a PNG, just copy it to the output directory
+        // If input is already a PNG, create a copy in the output directory for web viewing
+        // This ensures the original PNG file is never touched
         if (string.Equals(Path.GetExtension(inputPath), ".png", StringComparison.OrdinalIgnoreCase))
         {
-            if (inputPath != pngPath)
-            {
-                File.Copy(inputPath, pngPath, true);
-            }
+            File.Copy(inputPath, pngPath, false); // Never overwrite - we already have unique name
             return pngPath;
         }
 
-        // Convert to PNG
+        // Convert to PNG for web-friendly viewing (original file remains untouched)
         using var image = await Image.LoadAsync(inputPath, cancellationToken);
         var pngEncoder = new PngEncoder
         {
