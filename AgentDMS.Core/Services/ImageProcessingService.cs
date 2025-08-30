@@ -156,7 +156,8 @@ public class ImageProcessingService
         DetailedProgressReporter? progressReporter = null,
         IProgress<int>? progress = null,
         CancellationToken cancellationToken = default,
-        bool useMistralAI = false)
+        bool useMistralAI = false,
+        bool useMistralOcr = false)
     {
         var filePathsList = filePaths.ToList();
         var results = new List<ProcessingResult>();
@@ -191,7 +192,7 @@ public class ImageProcessingService
                     });
                 }
                 
-                var result = await ProcessImageAsync(filePath, fileProgressReporter, cancellationToken, useMistralAI);
+                var result = await ProcessImageAsync(filePath, fileProgressReporter, cancellationToken, useMistralAI, useMistralOcr);
                 
                 Interlocked.Increment(ref processedCount);
                 progress?.Report(processedCount);

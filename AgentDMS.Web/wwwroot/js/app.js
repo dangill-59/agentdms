@@ -499,12 +499,20 @@ async function handleBatchProcess(event) {
             showProgress(progressDiv, batchBtn, `Files uploaded (${uploadResult.successCount}/${uploadResult.successCount + uploadResult.errorCount}). Processing...`);
         }
         
+        // Get Mistral processing flags
+        const useMistralAI = document.getElementById('batchUseMistralAI').checked;
+        const useMistralOcr = document.getElementById('batchUseMistralOcr').checked;
+        
         const response = await fetch('/api/imageprocessing/batch-process', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ filePaths: finalFilePaths })
+            body: JSON.stringify({ 
+                filePaths: finalFilePaths,
+                useMistralAI: useMistralAI,
+                useMistralOcr: useMistralOcr
+            })
         });
         
         if (!response.ok) {
@@ -1004,32 +1012,71 @@ function displayBatchResults(container, results) {
     }
     
     results.forEach((result, index) => {
-        html += `
-            <div class="result-item ${result.success ? 'success' : 'error'}">
-                <div class="d-flex justify-content-between align-items-start">
-                    <div>
-                        <div class="file-name">
-                            File ${index + 1}: ${result.processedImage?.fileName || 'Unknown'}
+        if (result.success && result.processedImage) {
+            // Use the same detailed layout as the Upload and Process tab
+            const img = result.processedImage;
+            html += `
+                <div class="alert alert-success fade-in mt-3">
+                    <h6><i class="bi bi-check-circle"></i> File ${index + 1}: Processing Successful!</h6>
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <div class="file-info">
+                                <div class="file-name">${img.fileName}</div>
+                                <small class="text-muted">
+                                    Format: ${img.originalFormat} | 
+                                    Size: ${formatFileSize(img.fileSize)} |
+                                    Dimensions: ${img.width}×${img.height}px
+                                </small>
+                                ${img.isMultiPage ? `<br><small class="text-info">Multi-page document (${img.pageCount} pages)</small>` : ''}
+                            </div>
+                            
+                            <!-- Detailed Timing Metrics -->
+                            ${createTimingMetrics(result)}
+                            
+                            <!-- Mistral AI Analysis Results -->
+                            ${createAiAnalysisDisplay(result.aiAnalysis)}
+                            
+                            <!-- OCR Text Results -->
+                            ${createOcrResultsDisplay(result.extractedText)}
+                            
+                            <div class="mt-3">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <small><strong>Processing Details:</strong></small>
+                                        ${img.convertedPngPath ? `<br><small>PNG Version: ${img.convertedPngPath}</small>` : ''}
+                                    </div>
+                                    <div class="col-md-6">
+                                        ${img.splitPagePaths && img.splitPagePaths.length > 0 ? `
+                                            <small><strong>Split Pages:</strong></small>
+                                            <ul class="list-unstyled ms-3">
+                                                ${img.splitPagePaths.slice(0, 3).map(path => `<li><small>${path}</small></li>`).join('')}
+                                                ${img.splitPagePaths.length > 3 ? `<li><small>... and ${img.splitPagePaths.length - 3} more</small></li>` : ''}
+                                            </ul>
+                                        ` : ''}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        ${result.success ? `
-                            <small class="text-muted">
-                                ${result.processedImage?.originalFormat} | 
-                                ${formatFileSize(result.processedImage?.fileSize || 0)} |
-                                ${result.processedImage?.width || 0}×${result.processedImage?.height || 0}px
-                            </small>
-                        ` : `
-                            <small class="text-danger">${result.message}</small>
-                        `}
-                    </div>
-                    <div class="text-end">
-                        ${result.success ? 
-                            `<i class="bi bi-check-circle text-success"></i>` : 
-                            `<i class="bi bi-x-circle text-danger"></i>`
-                        }
                     </div>
                 </div>
-            </div>
-        `;
+            `;
+        } else {
+            // Error case - keep the simpler layout
+            html += `
+                <div class="result-item error mt-3">
+                    <div class="alert alert-danger">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="file-name">
+                                    <i class="bi bi-x-circle"></i> File ${index + 1}: ${result.processedImage?.fileName || 'Unknown'}
+                                </div>
+                                <small class="text-danger">${result.message}</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
     });
     
     container.innerHTML = html;

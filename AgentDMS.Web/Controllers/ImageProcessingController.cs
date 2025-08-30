@@ -447,7 +447,7 @@ public class ImageProcessingController : ControllerBase
                 await _progressBroadcaster.BroadcastProgress(jobId, progressReport);
             });
 
-            var results = await _imageProcessor.ProcessMultipleImagesAsync(filePathsList, progressReporter, progress);
+            var results = await _imageProcessor.ProcessMultipleImagesAsync(filePathsList, progressReporter, progress, cancellationToken: default, request.UseMistralAI, request.UseMistralOcr);
             
             // Report completion
             await _progressBroadcaster.BroadcastProgress(jobId, new ProgressReport
@@ -820,6 +820,20 @@ public class BatchProcessRequest
     [Required]
     [SwaggerSchema("List of file paths to process")]
     public IEnumerable<string> FilePaths { get; set; } = new List<string>();
+    
+    /// <summary>
+    /// Whether to use Mistral AI for document analysis
+    /// </summary>
+    /// <example>true</example>
+    [SwaggerSchema("Enable Mistral AI processing for document classification and data extraction")]
+    public bool UseMistralAI { get; set; } = false;
+    
+    /// <summary>
+    /// Whether to use Mistral OCR for text extraction
+    /// </summary>
+    /// <example>true</example>
+    [SwaggerSchema("Enable Mistral OCR for text extraction from images and documents")]
+    public bool UseMistralOcr { get; set; } = false;
 }
 
 /// <summary>
