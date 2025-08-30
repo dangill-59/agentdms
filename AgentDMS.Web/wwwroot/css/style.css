@@ -519,6 +519,13 @@ header h1 i {
     font-weight: 600;
 }
 
+/* OCR information styling */
+.ocr-info-row .timing-value {
+    font-size: 0.8rem;
+    color: #666;
+    font-style: italic;
+}
+
 /* Enhanced metrics sections */
 .metrics-section {
     margin-bottom: 16px;

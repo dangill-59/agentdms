@@ -74,4 +74,29 @@ public class ProcessingMetrics
     /// Time taken for AI document analysis
     /// </summary>
     public TimeSpan? AiAnalysisTime { get; set; }
+    
+    /// <summary>
+    /// Time taken for OCR text extraction
+    /// </summary>
+    public TimeSpan? OcrProcessingTime { get; set; }
+    
+    /// <summary>
+    /// OCR method used (e.g., "Tesseract", "Mistral")
+    /// </summary>
+    public string? OcrMethod { get; set; }
+    
+    /// <summary>
+    /// Mistral model used for processing (if applicable)
+    /// </summary>
+    public string? MistralModel { get; set; }
+    
+    /// <summary>
+    /// OCR confidence score (0.0 to 1.0)
+    /// </summary>
+    public double? OcrConfidence { get; set; }
+    
+    /// <summary>
+    /// Length of extracted text
+    /// </summary>
+    public int? ExtractedTextLength { get; set; }
 }

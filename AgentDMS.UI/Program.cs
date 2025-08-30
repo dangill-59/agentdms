@@ -493,6 +493,7 @@ class Program
         PrintStepStatistics("Conversion", metrics.Where(m => m.ConversionTime.HasValue).Select(m => m.ConversionTime!.Value.TotalMilliseconds));
         PrintStepStatistics("Thumbnail Generation", metrics.Where(m => m.ThumbnailGenerationTime.HasValue).Select(m => m.ThumbnailGenerationTime!.Value.TotalMilliseconds));
         PrintStepStatistics("AI Analysis", metrics.Where(m => m.AiAnalysisTime.HasValue).Select(m => m.AiAnalysisTime!.Value.TotalMilliseconds));
+        PrintStepStatistics("OCR Processing", metrics.Where(m => m.OcrProcessingTime.HasValue).Select(m => m.OcrProcessingTime!.Value.TotalMilliseconds));
 
         // Performance Insights
         var stepTimes = new Dictionary<string, double>();
@@ -511,6 +512,9 @@ class Program
         
         if (metrics.Any(m => m.AiAnalysisTime.HasValue))
             stepTimes["AI Analysis"] = metrics.Where(m => m.AiAnalysisTime.HasValue).Average(m => m.AiAnalysisTime!.Value.TotalMilliseconds);
+        
+        if (metrics.Any(m => m.OcrProcessingTime.HasValue))
+            stepTimes["OCR Processing"] = metrics.Where(m => m.OcrProcessingTime.HasValue).Average(m => m.OcrProcessingTime!.Value.TotalMilliseconds);
 
         if (stepTimes.Any())
         {
@@ -532,6 +536,95 @@ class Program
                     var percentage = (step.Value / totalStepTime) * 100;
                     Console.WriteLine($"  {step.Key}: {percentage:F1}%");
                 }
+            }
+        }
+        
+        // OCR Statistics
+        var resultsWithOcr = successfulResults.Where(r => !string.IsNullOrEmpty(r.ExtractedText)).ToList();
+        var ocrMetrics = metrics.Where(m => m.OcrProcessingTime.HasValue || !string.IsNullOrEmpty(m.OcrMethod)).ToList();
+        
+        if (resultsWithOcr.Any() || ocrMetrics.Any())
+        {
+            Console.WriteLine("\n--- OCR Processing Statistics ---");
+            Console.WriteLine($"Files with OCR processing: {resultsWithOcr.Count}");
+            
+            if (resultsWithOcr.Any())
+            {
+                var successRate = (resultsWithOcr.Count * 100.0) / totalFiles;
+                Console.WriteLine($"OCR success rate: {successRate:F1}%");
+                
+                var textLengths = resultsWithOcr.Where(r => r.ExtractedText != null)
+                    .Select(r => r.ExtractedText!.Length).ToList();
+                
+                if (textLengths.Any())
+                {
+                    Console.WriteLine($"Extracted text statistics:");
+                    Console.WriteLine($"  Average text length: {textLengths.Average():F0} characters");
+                    Console.WriteLine($"  Min text length: {textLengths.Min()} characters");
+                    Console.WriteLine($"  Max text length: {textLengths.Max()} characters");
+                    Console.WriteLine($"  Total characters extracted: {textLengths.Sum():N0}");
+                }
+            }
+            
+            // OCR Method breakdown
+            var ocrMethodCounts = ocrMetrics.Where(m => !string.IsNullOrEmpty(m.OcrMethod))
+                .GroupBy(m => m.OcrMethod)
+                .ToDictionary(g => g.Key!, g => g.Count());
+            
+            if (ocrMethodCounts.Any())
+            {
+                Console.WriteLine($"OCR methods used:");
+                foreach (var method in ocrMethodCounts.OrderByDescending(kvp => kvp.Value))
+                {
+                    var percentage = (method.Value * 100.0) / ocrMetrics.Count;
+                    Console.WriteLine($"  {method.Key}: {method.Value} files ({percentage:F1}%)");
+                }
+            }
+            
+            // OCR Confidence statistics
+            var confidenceScores = ocrMetrics.Where(m => m.OcrConfidence.HasValue)
+                .Select(m => m.OcrConfidence!.Value).ToList();
+            
+            if (confidenceScores.Any())
+            {
+                Console.WriteLine($"OCR confidence statistics:");
+                Console.WriteLine($"  Average confidence: {confidenceScores.Average():F2}");
+                Console.WriteLine($"  Min confidence: {confidenceScores.Min():F2}");
+                Console.WriteLine($"  Max confidence: {confidenceScores.Max():F2}");
+                Console.WriteLine($"  Files with high confidence (>0.8): {confidenceScores.Count(c => c > 0.8)}");
+            }
+        }
+        
+        // Mistral Configuration Statistics
+        var mistralMetrics = ocrMetrics.Where(m => !string.IsNullOrEmpty(m.MistralModel)).ToList();
+        
+        if (mistralMetrics.Any())
+        {
+            Console.WriteLine("\n--- Mistral Integration Statistics ---");
+            Console.WriteLine($"Files processed with Mistral: {mistralMetrics.Count}");
+            
+            // Mistral Model breakdown
+            var modelCounts = mistralMetrics.GroupBy(m => m.MistralModel)
+                .ToDictionary(g => g.Key!, g => g.Count());
+            
+            Console.WriteLine($"Mistral models used:");
+            foreach (var model in modelCounts.OrderByDescending(kvp => kvp.Value))
+            {
+                var percentage = (model.Value * 100.0) / mistralMetrics.Count;
+                Console.WriteLine($"  {model.Key}: {model.Value} files ({percentage:F1}%)");
+            }
+            
+            // Mistral processing times
+            var mistralOcrTimes = mistralMetrics.Where(m => m.OcrProcessingTime.HasValue)
+                .Select(m => m.OcrProcessingTime!.Value.TotalMilliseconds).ToList();
+            
+            if (mistralOcrTimes.Any())
+            {
+                Console.WriteLine($"Mistral OCR processing times:");
+                Console.WriteLine($"  Average: {mistralOcrTimes.Average():F0} ms");
+                Console.WriteLine($"  Min: {mistralOcrTimes.Min():F0} ms");
+                Console.WriteLine($"  Max: {mistralOcrTimes.Max():F0} ms");
+                Console.WriteLine($"  Total: {mistralOcrTimes.Sum():F0} ms ({mistralOcrTimes.Sum() / 1000:F1} seconds)");
             }
         }
     }
@@ -578,8 +671,22 @@ class Program
             Console.WriteLine($"Conversion time: {metrics.ConversionTime.Value.TotalMilliseconds:F0} ms");
         if (metrics.ThumbnailGenerationTime.HasValue)
             Console.WriteLine($"Thumbnail generation time: {metrics.ThumbnailGenerationTime.Value.TotalMilliseconds:F0} ms");
+        if (metrics.AiAnalysisTime.HasValue)
+            Console.WriteLine($"AI analysis time: {metrics.AiAnalysisTime.Value.TotalMilliseconds:F0} ms");
+        if (metrics.OcrProcessingTime.HasValue)
+            Console.WriteLine($"OCR processing time: {metrics.OcrProcessingTime.Value.TotalMilliseconds:F0} ms");
         if (metrics.TotalProcessingTime.HasValue)
             Console.WriteLine($"Total processing time: {metrics.TotalProcessingTime.Value.TotalMilliseconds:F0} ms");
+        
+        // OCR and Mistral information
+        if (!string.IsNullOrEmpty(metrics.OcrMethod))
+            Console.WriteLine($"OCR method: {metrics.OcrMethod}");
+        if (!string.IsNullOrEmpty(metrics.MistralModel))
+            Console.WriteLine($"Mistral model: {metrics.MistralModel}");
+        if (metrics.OcrConfidence.HasValue)
+            Console.WriteLine($"OCR confidence: {metrics.OcrConfidence.Value:F2}");
+        if (metrics.ExtractedTextLength.HasValue)
+            Console.WriteLine($"Extracted text length: {metrics.ExtractedTextLength.Value} characters");
     }
 
     private static void ShowHelp()
