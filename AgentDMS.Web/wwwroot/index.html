@@ -381,6 +381,29 @@
                                             <!-- Hidden file input for folder selection -->
                                             <input type="file" id="folderInput" webkitdirectory directory multiple style="display: none;" accept=".jpg,.jpeg,.png,.bmp,.gif,.tif,.tiff,.pdf,.webp">
                                         </div>
+                                        
+                                        <!-- Mistral AI Processing Option -->
+                                        <div class="mb-3">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="batchUseMistralAI" value="true">
+                                                <label class="form-check-label" for="batchUseMistralAI">
+                                                    Process with Mistral AI
+                                                </label>
+                                                <div class="form-text">Use Mistral AI for document classification and data extraction</div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Mistral OCR Processing Option -->
+                                        <div class="mb-3">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="batchUseMistralOcr" value="true">
+                                                <label class="form-check-label" for="batchUseMistralOcr">
+                                                    Use Mistral OCR
+                                                </label>
+                                                <div class="form-text">Use Mistral OCR for text extraction from images and documents</div>
+                                            </div>
+                                        </div>
+                                        
                                         <button type="submit" class="btn btn-primary" id="batchBtn">
                                             <i class="bi bi-collection"></i> Process All Files
                                         </button>
