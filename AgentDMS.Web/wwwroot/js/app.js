@@ -752,6 +752,12 @@ function createTimingMetrics(result) {
                     <span class="timing-value">${formatDuration(metrics.aiAnalysisTime)}</span>
                 </div>
             ` : ''}
+            ${metrics.ocrProcessingTime ? `
+                <div class="timing-row">
+                    <span class="timing-label">OCR Processing:</span>
+                    <span class="timing-value">${formatDuration(metrics.ocrProcessingTime)}</span>
+                </div>
+            ` : ''}
             <div class="timing-row">
                 <span class="timing-label">Total Processing:</span>
                 <span class="timing-value">${formatDuration(processingTime)}</span>
@@ -760,6 +766,17 @@ function createTimingMetrics(result) {
                 <span class="timing-label">UI Rendering:</span>
                 <span class="timing-value">${formatDuration(renderingTime)}</span>
             </div>
+            ${metrics.ocrMethod || metrics.mistralModel || metrics.ocrConfidence !== undefined || metrics.extractedTextLength !== undefined ? `
+                <div class="timing-row ocr-info-row">
+                    <span class="timing-label">OCR Information:</span>
+                    <span class="timing-value">
+                        ${metrics.ocrMethod ? `Method: ${metrics.ocrMethod}` : ''}
+                        ${metrics.mistralModel ? ` | Model: ${metrics.mistralModel}` : ''}
+                        ${metrics.ocrConfidence !== undefined ? ` | Confidence: ${(metrics.ocrConfidence * 100).toFixed(1)}%` : ''}
+                        ${metrics.extractedTextLength !== undefined ? ` | Text: ${metrics.extractedTextLength} chars` : ''}
+                    </span>
+                </div>
+            ` : ''}
         </div>
     `;
 }
@@ -1075,6 +1092,10 @@ function collectStepMetrics(successfulResults) {
         {
             name: 'AI Analysis',
             extractor: r => r.metrics?.aiAnalysisTime ? parseFloat(r.metrics.aiAnalysisTime) : 0
+        },
+        {
+            name: 'OCR Processing',
+            extractor: r => r.metrics?.ocrProcessingTime ? parseFloat(r.metrics.ocrProcessingTime) : 0
         }
     ];
     
