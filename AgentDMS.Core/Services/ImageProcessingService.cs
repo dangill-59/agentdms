@@ -10,6 +10,7 @@ using SixLabors.ImageSharp.Processing;
 using ImageMagick;
 using Microsoft.Extensions.Logging;
 using AgentDMS.Core.Models;
+using AgentDMS.Core.Utilities;
 
 namespace AgentDMS.Core.Services;
 
@@ -229,10 +230,10 @@ public class ImageProcessingService
             if (progressReporter != null)
                 await progressReporter.ReportProgress(imageFile.FileName, ProgressStatus.ConvertingPage, "Converting to PNG...", 1, 1, 1, 1);
 
-            // Conversion timing
+            // Conversion timing - create web-friendly PNG copy while preserving original
             var conversionStart = DateTime.UtcNow;
-            var pngPath = Path.Combine(_outputDirectory, $"{Path.GetFileNameWithoutExtension(imageFile.FileName)}.png");
-            await image.SaveAsPngAsync(pngPath, cancellationToken);
+            var pngPath = await ThumbnailGenerator.ConvertToPngAsync(
+                imageFile.OriginalFilePath, _outputDirectory, null, cancellationToken);
             imageFile.ConvertedPngPath = pngPath;
             metrics.ConversionTime = DateTime.UtcNow - conversionStart;
 
