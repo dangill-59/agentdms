@@ -14,6 +14,35 @@ namespace AgentDMS.Core.Utilities;
 public static class ThumbnailGenerator
 {
     /// <summary>
+    /// Generate a unique filename to avoid conflicts with existing files
+    /// </summary>
+    /// <param name="baseFilePath">The desired file path</param>
+    /// <returns>A unique file path that doesn't conflict with existing files</returns>
+    private static string GetUniqueFilePath(string baseFilePath)
+    {
+        if (!File.Exists(baseFilePath))
+        {
+            return baseFilePath;
+        }
+
+        var directory = Path.GetDirectoryName(baseFilePath) ?? "";
+        var fileName = Path.GetFileNameWithoutExtension(baseFilePath);
+        var extension = Path.GetExtension(baseFilePath);
+        
+        int counter = 1;
+        string uniquePath;
+        
+        do
+        {
+            uniquePath = Path.Combine(directory, $"{fileName}_processed_{counter}{extension}");
+            counter++;
+        }
+        while (File.Exists(uniquePath));
+        
+        return uniquePath;
+    }
+
+    /// <summary>
     /// Convert an image file to PNG format directly without thumbnail generation
     /// </summary>
     /// <param name="inputPath">Path to the input image file</param>
@@ -37,15 +66,20 @@ public static class ThumbnailGenerator
         var fileName = customName ?? Path.GetFileNameWithoutExtension(inputPath);
         var pngPath = Path.Combine(outputDirectory, $"{fileName}.png");
 
-        // If input is already a PNG, just copy it to the output directory
+        // If input is already a PNG, copy it to the output directory
         if (string.Equals(Path.GetExtension(inputPath), ".png", StringComparison.OrdinalIgnoreCase))
         {
             if (inputPath != pngPath)
             {
-                File.Copy(inputPath, pngPath, true);
+                // Generate a unique filename to avoid overwriting existing files
+                pngPath = GetUniqueFilePath(pngPath);
+                File.Copy(inputPath, pngPath, false); // Never overwrite
             }
             return pngPath;
         }
+
+        // Generate a unique filename to avoid overwriting existing files
+        pngPath = GetUniqueFilePath(pngPath);
 
         // Convert to PNG
         using var image = await Image.LoadAsync(inputPath, cancellationToken);
