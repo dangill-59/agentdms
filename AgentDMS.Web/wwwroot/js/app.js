@@ -1276,6 +1276,17 @@ function createFinalBatchSummary(stats) {
         return '';
     }
     
+    // Calculate how many timing cards we'll show
+    const hasProcessingTimes = stats.processing.times.length > 0;
+    const hasBatchTime = stats.batch.totalTime > 0;
+    const timingCardCount = (hasProcessingTimes ? 1 : 0) + (hasBatchTime ? 1 : 0);
+    
+    // Calculate column classes based on number of cards
+    // Base cards: Files, Pages, Successful, Failed = 4 cards
+    // Plus timing cards (0-2): Total Processing Time, Total Batch Time
+    const totalCards = 4 + timingCardCount;
+    const colClass = totalCards === 4 ? 'col-md-3' : 'col-md-2';
+    
     return `
         <div class="mt-4 pt-4" style="border-top: 3px solid #dee2e6;">
             <div class="alert alert-primary">
@@ -1283,7 +1294,7 @@ function createFinalBatchSummary(stats) {
                 
                 <!-- Files Overview -->
                 <div class="row mt-3">
-                    <div class="${stats.processing.times.length > 0 ? 'col-md-2' : 'col-md-3'} col-sm-6">
+                    <div class="${colClass} col-sm-6">
                         <div class="card border-success mb-3">
                             <div class="card-body text-center">
                                 <h6 class="card-title text-success"><i class="bi bi-files"></i> Files Processed</h6>
@@ -1292,7 +1303,7 @@ function createFinalBatchSummary(stats) {
                             </div>
                         </div>
                     </div>
-                    <div class="${stats.processing.times.length > 0 ? 'col-md-2' : 'col-md-3'} col-sm-6">
+                    <div class="${colClass} col-sm-6">
                         <div class="card border-info mb-3">
                             <div class="card-body text-center">
                                 <h6 class="card-title text-info"><i class="bi bi-file-earmark-text"></i> Pages Processed</h6>
@@ -1301,7 +1312,7 @@ function createFinalBatchSummary(stats) {
                             </div>
                         </div>
                     </div>
-                    ${stats.processing.times.length > 0 ? `
+                    ${hasProcessingTimes ? `
                     <div class="col-md-2 col-sm-6">
                         <div class="card border-primary mb-3">
                             <div class="card-body text-center">
@@ -1311,6 +1322,8 @@ function createFinalBatchSummary(stats) {
                             </div>
                         </div>
                     </div>
+                    ` : ''}
+                    ${hasBatchTime ? `
                     <div class="col-md-2 col-sm-6">
                         <div class="card border-warning mb-3">
                             <div class="card-body text-center">
@@ -1321,7 +1334,7 @@ function createFinalBatchSummary(stats) {
                         </div>
                     </div>
                     ` : ''}
-                    <div class="${stats.processing.times.length > 0 ? 'col-md-2' : 'col-md-3'} col-sm-6">
+                    <div class="${colClass} col-sm-6">
                         <div class="card border-success mb-3">
                             <div class="card-body text-center">
                                 <h6 class="card-title text-success"><i class="bi bi-check-circle"></i> Successful</h6>
@@ -1330,7 +1343,7 @@ function createFinalBatchSummary(stats) {
                             </div>
                         </div>
                     </div>
-                    <div class="${stats.processing.times.length > 0 ? 'col-md-2' : 'col-md-3'} col-sm-6">
+                    <div class="${colClass} col-sm-6">
                         <div class="card border-danger mb-3">
                             <div class="card-body text-center">
                                 <h6 class="card-title text-danger"><i class="bi bi-x-circle"></i> Failed</h6>
