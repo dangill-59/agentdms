@@ -529,17 +529,17 @@ async function handleBatchProcess(event) {
             await safeSignalRInvoke("JoinJob", jobId);
         }
         
-        // Calculate rendering time
-        const renderEndTime = performance.now();
-        const renderingTime = renderEndTime - renderStartTime;
+        // Calculate total batch processing time
+        const batchEndTime = performance.now();
+        const totalBatchTime = batchEndTime - renderStartTime;
         
         // Add rendering time to results
         results.forEach(result => {
-            result.renderingTime = formatDuration(renderingTime / results.length);
+            result.renderingTime = formatDuration(totalBatchTime / results.length);
         });
         
-        displayBatchResults(resultDiv, results);
-        displayImagesInViewer(imageViewer, results, renderingTime);
+        displayBatchResults(resultDiv, results, totalBatchTime);
+        displayImagesInViewer(imageViewer, results, totalBatchTime);
         
     } catch (error) {
         showError(resultDiv, `Batch processing failed: ${error.message}`);
@@ -903,7 +903,7 @@ function createOcrResultsDisplay(extractedText) {
     `;
 }
 
-function displayBatchResults(container, results) {
+function displayBatchResults(container, results, totalBatchTime) {
     const successful = results.filter(r => r.success).length;
     const failed = results.length - successful;
     const total = results.length;
@@ -926,7 +926,7 @@ function displayBatchResults(container, results) {
     `;
     
     // Add final batch summary report before individual results
-    const finalStats = calculateFinalBatchStatistics(results);
+    const finalStats = calculateFinalBatchStatistics(results, totalBatchTime);
     html += createFinalBatchSummary(finalStats);
     
     // Show comprehensive timing summary for successful results
@@ -1160,7 +1160,7 @@ function collectStepMetrics(successfulResults) {
     return stepMetrics;
 }
 
-function calculateFinalBatchStatistics(results) {
+function calculateFinalBatchStatistics(results, totalBatchTime) {
     const total = results.length;
     const successful = results.filter(r => r.success).length;
     const failed = total - successful;
@@ -1262,6 +1262,9 @@ function calculateFinalBatchStatistics(results) {
             totalTime: renderingTimes.reduce((sum, time) => sum + time, 0),
             avgTime: renderingTimes.length > 0 ? renderingTimes.reduce((sum, time) => sum + time, 0) / renderingTimes.length : 0
         },
+        batch: {
+            totalTime: totalBatchTime ? totalBatchTime / 1000 : 0  // Convert from milliseconds to seconds
+        },
         ocr: ocrStats,
         ai: aiStats,
         steps: stepMetrics
@@ -1308,8 +1311,17 @@ function createFinalBatchSummary(stats) {
                             </div>
                         </div>
                     </div>
+                    <div class="col-md-2 col-sm-6">
+                        <div class="card border-warning mb-3">
+                            <div class="card-body text-center">
+                                <h6 class="card-title text-warning"><i class="bi bi-clock"></i> Total Batch Time</h6>
+                                <h4 class="text-warning">${stats.batch.totalTime.toFixed(2)}s</h4>
+                                <small class="text-muted">End-to-End</small>
+                            </div>
+                        </div>
+                    </div>
                     ` : ''}
-                    <div class="${stats.processing.times.length > 0 ? 'col-md-3' : 'col-md-3'} col-sm-6">
+                    <div class="${stats.processing.times.length > 0 ? 'col-md-2' : 'col-md-3'} col-sm-6">
                         <div class="card border-success mb-3">
                             <div class="card-body text-center">
                                 <h6 class="card-title text-success"><i class="bi bi-check-circle"></i> Successful</h6>
@@ -1318,7 +1330,7 @@ function createFinalBatchSummary(stats) {
                             </div>
                         </div>
                     </div>
-                    <div class="${stats.processing.times.length > 0 ? 'col-md-3' : 'col-md-3'} col-sm-6">
+                    <div class="${stats.processing.times.length > 0 ? 'col-md-2' : 'col-md-3'} col-sm-6">
                         <div class="card border-danger mb-3">
                             <div class="card-body text-center">
                                 <h6 class="card-title text-danger"><i class="bi bi-x-circle"></i> Failed</h6>
