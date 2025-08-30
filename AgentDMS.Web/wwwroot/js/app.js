@@ -1079,6 +1079,10 @@ function displayBatchResults(container, results) {
         }
     });
     
+    // Add final summary report after all per-file results
+    const finalStats = calculateFinalBatchStatistics(results);
+    html += createFinalBatchSummary(finalStats);
+    
     container.innerHTML = html;
 }
 
@@ -1154,6 +1158,288 @@ function collectStepMetrics(successfulResults) {
     });
     
     return stepMetrics;
+}
+
+function calculateFinalBatchStatistics(results) {
+    const total = results.length;
+    const successful = results.filter(r => r.success).length;
+    const failed = total - successful;
+    const successfulResults = results.filter(r => r.success);
+    
+    // Processing time statistics
+    const processingTimes = successfulResults
+        .map(r => r.processingTime ? parseFloat(r.processingTime) : 0)
+        .filter(t => t > 0);
+    
+    const renderingTimes = successfulResults
+        .map(r => r.renderingTime ? parseFloat(r.renderingTime) : 0)
+        .filter(t => t > 0);
+    
+    // OCR statistics
+    const ocrStats = {
+        totalWithOcr: 0,
+        totalCharacters: 0,
+        avgCharacters: 0,
+        successRate: 0
+    };
+    
+    successfulResults.forEach(result => {
+        if (result.extractedText && result.extractedText.trim()) {
+            ocrStats.totalWithOcr++;
+            ocrStats.totalCharacters += result.extractedText.length;
+        }
+    });
+    
+    if (ocrStats.totalWithOcr > 0) {
+        ocrStats.avgCharacters = ocrStats.totalCharacters / ocrStats.totalWithOcr;
+        ocrStats.successRate = (ocrStats.totalWithOcr / successful) * 100;
+    }
+    
+    // AI Analysis statistics
+    const aiStats = {
+        totalWithAi: 0,
+        totalSuccessful: 0,
+        totalFailed: 0,
+        avgConfidence: 0,
+        documentTypes: {},
+        successRate: 0,
+        avgConfidenceOfSuccessful: 0
+    };
+    
+    successfulResults.forEach(result => {
+        if (result.aiAnalysis) {
+            aiStats.totalWithAi++;
+            if (result.aiAnalysis.success) {
+                aiStats.totalSuccessful++;
+                if (result.aiAnalysis.confidence) {
+                    aiStats.avgConfidence += result.aiAnalysis.confidence;
+                }
+                if (result.aiAnalysis.documentType) {
+                    const docType = result.aiAnalysis.documentType;
+                    aiStats.documentTypes[docType] = (aiStats.documentTypes[docType] || 0) + 1;
+                }
+            } else {
+                aiStats.totalFailed++;
+            }
+        }
+    });
+    
+    if (aiStats.totalWithAi > 0) {
+        aiStats.successRate = (aiStats.totalSuccessful / aiStats.totalWithAi) * 100;
+    }
+    
+    if (aiStats.totalSuccessful > 0) {
+        aiStats.avgConfidenceOfSuccessful = (aiStats.avgConfidence / aiStats.totalSuccessful) * 100;
+    }
+    
+    // Aggregate step metrics
+    const stepMetrics = collectStepMetrics(successfulResults);
+    
+    return {
+        files: { total, successful, failed },
+        processing: {
+            times: processingTimes,
+            totalTime: processingTimes.reduce((sum, time) => sum + time, 0),
+            avgTime: processingTimes.length > 0 ? processingTimes.reduce((sum, time) => sum + time, 0) / processingTimes.length : 0,
+            minTime: processingTimes.length > 0 ? Math.min(...processingTimes) : 0,
+            maxTime: processingTimes.length > 0 ? Math.max(...processingTimes) : 0,
+            medianTime: processingTimes.length > 0 ? getMedian(processingTimes) : 0
+        },
+        rendering: {
+            times: renderingTimes,
+            totalTime: renderingTimes.reduce((sum, time) => sum + time, 0),
+            avgTime: renderingTimes.length > 0 ? renderingTimes.reduce((sum, time) => sum + time, 0) / renderingTimes.length : 0
+        },
+        ocr: ocrStats,
+        ai: aiStats,
+        steps: stepMetrics
+    };
+}
+
+function createFinalBatchSummary(stats) {
+    if (stats.files.total === 0) {
+        return '';
+    }
+    
+    return `
+        <div class="mt-4 pt-4" style="border-top: 3px solid #dee2e6;">
+            <div class="alert alert-primary">
+                <h5><i class="bi bi-clipboard-data"></i> Final Batch Summary Report</h5>
+                
+                <!-- Files Overview -->
+                <div class="row mt-3">
+                    <div class="col-md-4">
+                        <div class="card border-success mb-3">
+                            <div class="card-body text-center">
+                                <h6 class="card-title text-success"><i class="bi bi-files"></i> Files Processed</h6>
+                                <h4 class="text-success">${stats.files.total}</h4>
+                                <small class="text-muted">Total Files</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card border-success mb-3">
+                            <div class="card-body text-center">
+                                <h6 class="card-title text-success"><i class="bi bi-check-circle"></i> Successful</h6>
+                                <h4 class="text-success">${stats.files.successful}</h4>
+                                <small class="text-muted">${((stats.files.successful / stats.files.total) * 100).toFixed(1)}% Success Rate</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card border-danger mb-3">
+                            <div class="card-body text-center">
+                                <h6 class="card-title text-danger"><i class="bi bi-x-circle"></i> Failed</h6>
+                                <h4 class="text-danger">${stats.files.failed}</h4>
+                                <small class="text-muted">${((stats.files.failed / stats.files.total) * 100).toFixed(1)}% Failure Rate</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Performance Summary -->
+                ${stats.processing.times.length > 0 ? `
+                    <div class="metrics-section mt-4">
+                        <h6 class="metrics-subtitle"><i class="bi bi-speedometer2"></i> Overall Performance Summary</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="timing-row">
+                                    <span class="timing-label">Total Processing Time:</span>
+                                    <span class="timing-value total">${stats.processing.totalTime.toFixed(2)}s</span>
+                                </div>
+                                <div class="timing-row">
+                                    <span class="timing-label">Average Processing Time:</span>
+                                    <span class="timing-value">${stats.processing.avgTime.toFixed(2)}s</span>
+                                </div>
+                                <div class="timing-row">
+                                    <span class="timing-label">Median Processing Time:</span>
+                                    <span class="timing-value">${stats.processing.medianTime.toFixed(2)}s</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="timing-row">
+                                    <span class="timing-label">Fastest File:</span>
+                                    <span class="timing-value">${stats.processing.minTime.toFixed(2)}s</span>
+                                </div>
+                                <div class="timing-row">
+                                    <span class="timing-label">Slowest File:</span>
+                                    <span class="timing-value">${stats.processing.maxTime.toFixed(2)}s</span>
+                                </div>
+                                ${stats.rendering.times.length > 0 ? `
+                                    <div class="timing-row">
+                                        <span class="timing-label">Total UI Rendering:</span>
+                                        <span class="timing-value">${stats.rendering.totalTime.toFixed(2)}s</span>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>
+                ` : ''}
+                
+                <!-- Step-by-Step Summary -->
+                ${stats.steps.length > 0 ? `
+                    <div class="metrics-section mt-4">
+                        <h6 class="metrics-subtitle"><i class="bi bi-list-ol"></i> Processing Steps Summary</h6>
+                        <div class="row">
+                            ${stats.steps.map(step => `
+                                <div class="col-md-6 col-lg-4 mb-2">
+                                    <div class="card border-light">
+                                        <div class="card-body p-2">
+                                            <h6 class="card-title text-primary">${step.name}</h6>
+                                            <small class="text-muted">
+                                                Files: ${step.count} | 
+                                                Total: ${step.total.toFixed(2)}s |
+                                                Avg: ${step.avg.toFixed(2)}s
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+                
+                <!-- OCR Statistics -->
+                ${stats.ocr.totalWithOcr > 0 ? `
+                    <div class="metrics-section mt-4">
+                        <h6 class="metrics-subtitle"><i class="bi bi-text-paragraph"></i> OCR Text Extraction Summary</h6>
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="timing-row">
+                                    <span class="timing-label">Files with OCR:</span>
+                                    <span class="timing-value">${stats.ocr.totalWithOcr}</span>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="timing-row">
+                                    <span class="timing-label">OCR Success Rate:</span>
+                                    <span class="timing-value">${stats.ocr.successRate.toFixed(1)}%</span>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="timing-row">
+                                    <span class="timing-label">Total Characters:</span>
+                                    <span class="timing-value">${stats.ocr.totalCharacters.toLocaleString()}</span>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="timing-row">
+                                    <span class="timing-label">Avg Characters/File:</span>
+                                    <span class="timing-value">${Math.round(stats.ocr.avgCharacters)}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ` : ''}
+                
+                <!-- AI Analysis Statistics -->
+                ${stats.ai.totalWithAi > 0 ? `
+                    <div class="metrics-section mt-4">
+                        <h6 class="metrics-subtitle"><i class="bi bi-robot"></i> Mistral AI Analysis Summary</h6>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="timing-row">
+                                    <span class="timing-label">Files with AI Analysis:</span>
+                                    <span class="timing-value">${stats.ai.totalWithAi}</span>
+                                </div>
+                                <div class="timing-row">
+                                    <span class="timing-label">AI Success Rate:</span>
+                                    <span class="timing-value">${stats.ai.successRate.toFixed(1)}%</span>
+                                </div>
+                                ${stats.ai.totalSuccessful > 0 ? `
+                                    <div class="timing-row">
+                                        <span class="timing-label">Avg Confidence:</span>
+                                        <span class="timing-value">${stats.ai.avgConfidenceOfSuccessful.toFixed(1)}%</span>
+                                    </div>
+                                ` : ''}
+                            </div>
+                            <div class="col-md-4">
+                                <div class="timing-row">
+                                    <span class="timing-label">Successful Analysis:</span>
+                                    <span class="timing-value text-success">${stats.ai.totalSuccessful}</span>
+                                </div>
+                                <div class="timing-row">
+                                    <span class="timing-label">Failed Analysis:</span>
+                                    <span class="timing-value text-danger">${stats.ai.totalFailed}</span>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                ${Object.keys(stats.ai.documentTypes).length > 0 ? `
+                                    <small><strong>Document Types Found:</strong></small>
+                                    ${Object.entries(stats.ai.documentTypes).map(([type, count]) => `
+                                        <div class="timing-row">
+                                            <span class="timing-label">${type}:</span>
+                                            <span class="timing-value">${count}</span>
+                                        </div>
+                                    `).join('')}
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>
+                ` : ''}
+            </div>
+        </div>
+    `;
 }
 
 // Image viewer functions
