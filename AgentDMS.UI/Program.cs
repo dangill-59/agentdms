@@ -462,6 +462,23 @@ class Program
         Console.WriteLine($"Successful: {successfulResults.Count} ({(successfulResults.Count * 100.0 / totalFiles):F1}%)");
         Console.WriteLine($"Failed: {failedResults.Count} ({(failedResults.Count * 100.0 / totalFiles):F1}%)");
         
+        // Calculate total pages processed
+        var totalPages = 0;
+        foreach (var result in successfulResults)
+        {
+            if (result.SplitPages?.Any() == true)
+            {
+                // For multi-page documents, count the split pages
+                totalPages += result.SplitPages.Count;
+            }
+            else if (result.ProcessedImage != null)
+            {
+                // For single-page documents, use the page count from the processed image
+                totalPages += result.ProcessedImage.PageCount;
+            }
+        }
+        Console.WriteLine($"Total pages processed: {totalPages}");
+        
         if (!successfulWithMetrics.Any())
         {
             Console.WriteLine("No detailed metrics available for successful results.");

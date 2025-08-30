@@ -1175,6 +1175,18 @@ function calculateFinalBatchStatistics(results) {
         .map(r => r.renderingTime ? parseFloat(r.renderingTime) : 0)
         .filter(t => t > 0);
     
+    // Calculate total pages processed
+    let totalPages = 0;
+    successfulResults.forEach(result => {
+        if (result.splitPages && result.splitPages.length > 0) {
+            // For multi-page documents, count the split pages
+            totalPages += result.splitPages.length;
+        } else if (result.processedImage && result.processedImage.pageCount) {
+            // For single-page documents, use the page count from the processed image
+            totalPages += result.processedImage.pageCount;
+        }
+    });
+    
     // OCR statistics
     const ocrStats = {
         totalWithOcr: 0,
@@ -1236,7 +1248,7 @@ function calculateFinalBatchStatistics(results) {
     const stepMetrics = collectStepMetrics(successfulResults);
     
     return {
-        files: { total, successful, failed },
+        files: { total, successful, failed, totalPages },
         processing: {
             times: processingTimes,
             totalTime: processingTimes.reduce((sum, time) => sum + time, 0),
@@ -1268,7 +1280,7 @@ function createFinalBatchSummary(stats) {
                 
                 <!-- Files Overview -->
                 <div class="row mt-3">
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <div class="card border-success mb-3">
                             <div class="card-body text-center">
                                 <h6 class="card-title text-success"><i class="bi bi-files"></i> Files Processed</h6>
@@ -1277,7 +1289,16 @@ function createFinalBatchSummary(stats) {
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
+                        <div class="card border-info mb-3">
+                            <div class="card-body text-center">
+                                <h6 class="card-title text-info"><i class="bi bi-file-earmark-text"></i> Pages Processed</h6>
+                                <h4 class="text-info">${stats.files.totalPages}</h4>
+                                <small class="text-muted">Total Pages</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
                         <div class="card border-success mb-3">
                             <div class="card-body text-center">
                                 <h6 class="card-title text-success"><i class="bi bi-check-circle"></i> Successful</h6>
@@ -1286,7 +1307,7 @@ function createFinalBatchSummary(stats) {
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <div class="card border-danger mb-3">
                             <div class="card-body text-center">
                                 <h6 class="card-title text-danger"><i class="bi bi-x-circle"></i> Failed</h6>
