@@ -908,108 +908,19 @@ function displayBatchResults(container, results) {
     const failed = results.length - successful;
     const total = results.length;
     
-    let html = `
-        <div class="alert alert-info fade-in">
-            <h6><i class="bi bi-collection"></i> Batch Processing Complete</h6>
-            <p class="mb-1">
-                <span class="badge bg-success me-2">${successful} Successful</span>
-                <span class="badge bg-danger me-2">${failed} Failed</span>
-                <span class="badge bg-secondary">${total} Total</span>
-            </p>
-            <div class="mt-2">
-                <small class="text-muted">
-                    Success Rate: ${(successful / total * 100).toFixed(1)}% | 
-                    Failure Rate: ${(failed / total * 100).toFixed(1)}%
-                </small>
-            </div>
+    // Calculate final batch statistics first
+    const finalStats = calculateFinalBatchStatistics(results);
+    
+    // Start with the final summary report at the top
+    let html = createFinalBatchSummary(finalStats);
+    
+    // Add clear separation before per-file results
+    html += `
+        <div class="mt-5 pt-4" style="border-top: 2px solid #6c757d;">
+            <h5><i class="bi bi-list-check"></i> Individual File Results</h5>
+            <p class="text-muted mb-4">Detailed processing results for each file in the batch:</p>
         </div>
     `;
-    
-    // Show comprehensive timing summary for successful results
-    if (successful > 0) {
-        const successfulResults = results.filter(r => r.success);
-        const processingTimes = successfulResults
-            .map(r => r.processingTime ? parseFloat(r.processingTime) : 0)
-            .filter(t => t > 0);
-        
-        if (processingTimes.length > 0) {
-            const totalProcessingTime = processingTimes.reduce((sum, time) => sum + time, 0);
-            const avgProcessingTime = totalProcessingTime / processingTimes.length;
-            const minProcessingTime = Math.min(...processingTimes);
-            const maxProcessingTime = Math.max(...processingTimes);
-            const medianProcessingTime = getMedian(processingTimes);
-            
-            // Collect step-specific metrics
-            const stepMetrics = collectStepMetrics(successfulResults);
-            
-            html += `
-                <div class="timing-metrics">
-                    <h6><i class="bi bi-stopwatch"></i> Comprehensive Batch Statistics</h6>
-                    
-                    <!-- Overall Statistics -->
-                    <div class="metrics-section">
-                        <h6 class="metrics-subtitle"><i class="bi bi-bar-chart"></i> Overall Performance</h6>
-                        <div class="timing-row">
-                            <span class="timing-label">Total Files Attempted:</span>
-                            <span class="timing-value">${total}</span>
-                        </div>
-                        <div class="timing-row">
-                            <span class="timing-label">Files with Metrics:</span>
-                            <span class="timing-value">${processingTimes.length}</span>
-                        </div>
-                        <div class="timing-row">
-                            <span class="timing-label">Average Processing Time:</span>
-                            <span class="timing-value">${avgProcessingTime.toFixed(2)}s</span>
-                        </div>
-                        <div class="timing-row">
-                            <span class="timing-label">Minimum Processing Time:</span>
-                            <span class="timing-value">${minProcessingTime.toFixed(2)}s</span>
-                        </div>
-                        <div class="timing-row">
-                            <span class="timing-label">Maximum Processing Time:</span>
-                            <span class="timing-value">${maxProcessingTime.toFixed(2)}s</span>
-                        </div>
-                        <div class="timing-row">
-                            <span class="timing-label">Median Processing Time:</span>
-                            <span class="timing-value">${medianProcessingTime.toFixed(2)}s</span>
-                        </div>
-                        <div class="timing-row">
-                            <span class="timing-label">Total Processing Time:</span>
-                            <span class="timing-value total">${totalProcessingTime.toFixed(2)}s</span>
-                        </div>
-                    </div>
-                    
-                    ${stepMetrics.length > 0 ? `
-                        <!-- Step-by-Step Breakdown -->
-                        <div class="metrics-section">
-                            <h6 class="metrics-subtitle"><i class="bi bi-gear"></i> Processing Step Breakdown</h6>
-                            ${stepMetrics.map(step => `
-                                <div class="step-metrics">
-                                    <strong>${step.name}:</strong>
-                                    <div class="timing-row">
-                                        <span class="timing-label">Files Processed:</span>
-                                        <span class="timing-value">${step.count}</span>
-                                    </div>
-                                    <div class="timing-row">
-                                        <span class="timing-label">Average Time:</span>
-                                        <span class="timing-value">${step.avg.toFixed(2)}s</span>
-                                    </div>
-                                    <div class="timing-row">
-                                        <span class="timing-label">Total Time:</span>
-                                        <span class="timing-value">${step.total.toFixed(2)}s</span>
-                                    </div>
-                                    <div class="timing-row">
-                                        <span class="timing-label">Min/Max:</span>
-                                        <span class="timing-value">${step.min.toFixed(2)}s / ${step.max.toFixed(2)}s</span>
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    ` : ''}
-                </div>
-            `;
-        }
-    }
     
     results.forEach((result, index) => {
         if (result.success && result.processedImage) {
@@ -1078,10 +989,6 @@ function displayBatchResults(container, results) {
             `;
         }
     });
-    
-    // Add final summary report after all per-file results
-    const finalStats = calculateFinalBatchStatistics(results);
-    html += createFinalBatchSummary(finalStats);
     
     container.innerHTML = html;
 }
@@ -1232,11 +1139,26 @@ function calculateFinalBatchStatistics(results) {
         aiStats.avgConfidenceOfSuccessful = (aiStats.avgConfidence / aiStats.totalSuccessful) * 100;
     }
     
+    // Calculate total page count
+    let totalPageCount = 0;
+    successfulResults.forEach(result => {
+        if (result.processedImage) {
+            const img = result.processedImage;
+            if (img.isMultiPage && img.pageCount) {
+                totalPageCount += img.pageCount;
+            } else {
+                // For non-multipage documents, count as 1 page
+                totalPageCount += 1;
+            }
+        }
+    });
+    
     // Aggregate step metrics
     const stepMetrics = collectStepMetrics(successfulResults);
     
     return {
         files: { total, successful, failed },
+        pages: { totalCount: totalPageCount },
         processing: {
             times: processingTimes,
             totalTime: processingTimes.reduce((sum, time) => sum + time, 0),
@@ -1268,7 +1190,7 @@ function createFinalBatchSummary(stats) {
                 
                 <!-- Files Overview -->
                 <div class="row mt-3">
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <div class="card border-success mb-3">
                             <div class="card-body text-center">
                                 <h6 class="card-title text-success"><i class="bi bi-files"></i> Files Processed</h6>
@@ -1277,7 +1199,16 @@ function createFinalBatchSummary(stats) {
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
+                        <div class="card border-info mb-3">
+                            <div class="card-body text-center">
+                                <h6 class="card-title text-info"><i class="bi bi-file-earmark-text"></i> Pages Processed</h6>
+                                <h4 class="text-info">${stats.pages.totalCount}</h4>
+                                <small class="text-muted">Total Pages</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
                         <div class="card border-success mb-3">
                             <div class="card-body text-center">
                                 <h6 class="card-title text-success"><i class="bi bi-check-circle"></i> Successful</h6>
@@ -1286,7 +1217,7 @@ function createFinalBatchSummary(stats) {
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <div class="card border-danger mb-3">
                             <div class="card-body text-center">
                                 <h6 class="card-title text-danger"><i class="bi bi-x-circle"></i> Failed</h6>
