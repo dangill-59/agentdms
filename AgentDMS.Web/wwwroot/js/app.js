@@ -925,6 +925,10 @@ function displayBatchResults(container, results) {
         </div>
     `;
     
+    // Add final batch summary report before individual results
+    const finalStats = calculateFinalBatchStatistics(results);
+    html += createFinalBatchSummary(finalStats);
+    
     // Show comprehensive timing summary for successful results
     if (successful > 0) {
         const successfulResults = results.filter(r => r.success);
@@ -1078,10 +1082,6 @@ function displayBatchResults(container, results) {
             `;
         }
     });
-    
-    // Add final summary report after all per-file results
-    const finalStats = calculateFinalBatchStatistics(results);
-    html += createFinalBatchSummary(finalStats);
     
     container.innerHTML = html;
 }
