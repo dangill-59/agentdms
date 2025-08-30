@@ -1280,7 +1280,7 @@ function createFinalBatchSummary(stats) {
                 
                 <!-- Files Overview -->
                 <div class="row mt-3">
-                    <div class="col-md-3">
+                    <div class="${stats.processing.times.length > 0 ? 'col-md-2' : 'col-md-3'} col-sm-6">
                         <div class="card border-success mb-3">
                             <div class="card-body text-center">
                                 <h6 class="card-title text-success"><i class="bi bi-files"></i> Files Processed</h6>
@@ -1289,7 +1289,7 @@ function createFinalBatchSummary(stats) {
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="${stats.processing.times.length > 0 ? 'col-md-2' : 'col-md-3'} col-sm-6">
                         <div class="card border-info mb-3">
                             <div class="card-body text-center">
                                 <h6 class="card-title text-info"><i class="bi bi-file-earmark-text"></i> Pages Processed</h6>
@@ -1298,7 +1298,18 @@ function createFinalBatchSummary(stats) {
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    ${stats.processing.times.length > 0 ? `
+                    <div class="col-md-2 col-sm-6">
+                        <div class="card border-primary mb-3">
+                            <div class="card-body text-center">
+                                <h6 class="card-title text-primary"><i class="bi bi-stopwatch"></i> Total Processing Time</h6>
+                                <h4 class="text-primary">${stats.processing.totalTime.toFixed(2)}s</h4>
+                                <small class="text-muted">All Files Combined</small>
+                            </div>
+                        </div>
+                    </div>
+                    ` : ''}
+                    <div class="${stats.processing.times.length > 0 ? 'col-md-3' : 'col-md-3'} col-sm-6">
                         <div class="card border-success mb-3">
                             <div class="card-body text-center">
                                 <h6 class="card-title text-success"><i class="bi bi-check-circle"></i> Successful</h6>
@@ -1307,7 +1318,7 @@ function createFinalBatchSummary(stats) {
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="${stats.processing.times.length > 0 ? 'col-md-3' : 'col-md-3'} col-sm-6">
                         <div class="card border-danger mb-3">
                             <div class="card-body text-center">
                                 <h6 class="card-title text-danger"><i class="bi bi-x-circle"></i> Failed</h6>
