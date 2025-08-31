@@ -38,6 +38,12 @@ public class ScanRequest
     /// Whether to automatically process the scanned image through the processing pipeline
     /// </summary>
     public bool AutoProcess { get; set; } = true;
+    
+    /// <summary>
+    /// Auto-rotation angle in degrees (0, 90, 180, 270)
+    /// </summary>
+    [Range(0, 360)]
+    public int AutoRotation { get; set; } = 0;
 }
 
 /// <summary>

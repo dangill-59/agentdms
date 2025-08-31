@@ -116,12 +116,32 @@ class AgentDMSApp {
 
         const resetZoomBtn = document.getElementById('resetZoomBtn');
         if (resetZoomBtn) {
-            resetZoomBtn.addEventListener('click', () => this.viewer.resetView());
+            resetZoomBtn.addEventListener('click', () => {
+                this.viewer.resetView();
+                this.syncRotationDropdown();
+            });
         }
 
-        const rotateBtn = document.getElementById('rotateBtn');
-        if (rotateBtn) {
-            rotateBtn.addEventListener('click', () => this.viewer.rotateClockwise());
+        // Enhanced rotation controls
+        const rotateLeftBtn = document.getElementById('rotateLeftBtn');
+        if (rotateLeftBtn) {
+            rotateLeftBtn.addEventListener('click', () => {
+                this.viewer.rotateCounterClockwise();
+                this.syncRotationDropdown();
+            });
+        }
+
+        const rotateRightBtn = document.getElementById('rotateRightBtn');
+        if (rotateRightBtn) {
+            rotateRightBtn.addEventListener('click', () => {
+                this.viewer.rotateClockwise();
+                this.syncRotationDropdown();
+            });
+        }
+
+        const rotationSelect = document.getElementById('rotationSelect');
+        if (rotationSelect) {
+            rotationSelect.addEventListener('change', (e) => this.setPreciseRotation(parseInt(e.target.value)));
         }
 
         // Upload operations
@@ -350,6 +370,36 @@ class AgentDMSApp {
                 annotateBtn.classList.remove('active');
                 annotateBtn.innerHTML = '<i class="bi bi-pencil"></i> Annotate';
             }
+        }
+    }
+
+    setPreciseRotation(targetRotation) {
+        if (!this.viewer.getCurrentFile()) {
+            this.showError('Please load a file first');
+            return;
+        }
+        
+        // Calculate the rotation needed to reach target
+        const currentRotation = this.viewer.getRotation();
+        let rotationDiff = targetRotation - currentRotation;
+        
+        // Normalize the rotation difference to the shortest path
+        while (rotationDiff > 180) rotationDiff -= 360;
+        while (rotationDiff < -180) rotationDiff += 360;
+        
+        // Apply the rotation
+        this.viewer.rotate(rotationDiff);
+        
+        this.showStatus(`Rotated to ${targetRotation}°`, 'success');
+    }
+
+    syncRotationDropdown() {
+        const rotationSelect = document.getElementById('rotationSelect');
+        if (rotationSelect && this.viewer.getCurrentFile()) {
+            const currentRotation = this.viewer.getRotation();
+            // Normalize rotation to 0-360 range
+            const normalizedRotation = ((currentRotation % 360) + 360) % 360;
+            rotationSelect.value = normalizedRotation;
         }
     }
 

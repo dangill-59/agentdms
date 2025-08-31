@@ -2272,6 +2272,7 @@ async function performScan(isPreview = false) {
     const scanFormat = document.getElementById('scanFormat');
     const showScannerUI = document.getElementById('showScannerUI');
     const autoProcess = document.getElementById('autoProcess');
+    const scanRotation = document.getElementById('scanRotation');
     
     const scanRequest = {
         scannerDeviceId: scannerSelect.value,
@@ -2279,7 +2280,8 @@ async function performScan(isPreview = false) {
         colorMode: parseInt(scanColorMode.value),
         format: parseInt(scanFormat.value),
         showUserInterface: isPreview || showScannerUI.checked,
-        autoProcess: !isPreview && autoProcess.checked
+        autoProcess: !isPreview && autoProcess.checked,
+        autoRotation: parseInt(scanRotation.value)
     };
     
     const scanBtn = isPreview ? document.getElementById('previewScanBtn') : document.getElementById('startScanBtn');

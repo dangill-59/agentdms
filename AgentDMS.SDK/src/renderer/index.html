@@ -69,9 +69,23 @@
                                 <button class="btn btn-outline-primary btn-sm" id="resetZoomBtn">
                                     <i class="bi bi-aspect-ratio"></i> Reset Zoom
                                 </button>
-                                <button class="btn btn-outline-primary btn-sm" id="rotateBtn">
-                                    <i class="bi bi-arrow-clockwise"></i> Rotate
-                                </button>
+                                <div class="btn-group w-100" role="group" aria-label="Rotation controls">
+                                    <button class="btn btn-outline-primary btn-sm" id="rotateLeftBtn" title="Rotate 90° counterclockwise">
+                                        <i class="bi bi-arrow-counterclockwise"></i> 90° ↺
+                                    </button>
+                                    <button class="btn btn-outline-primary btn-sm" id="rotateRightBtn" title="Rotate 90° clockwise">
+                                        <i class="bi bi-arrow-clockwise"></i> 90° ↻
+                                    </button>
+                                </div>
+                                <div class="mb-2">
+                                    <label for="rotationSelect" class="form-label" style="font-size: 0.875rem; margin-bottom: 0.25rem;">Precise Rotation</label>
+                                    <select class="form-select form-select-sm" id="rotationSelect">
+                                        <option value="0" selected>0° (Normal)</option>
+                                        <option value="90">90° (Portrait)</option>
+                                        <option value="180">180° (Inverted)</option>
+                                        <option value="270">270° (Landscape)</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
                     </div>
