@@ -128,15 +128,21 @@ public class StorageProviderTests
     }
     
     [Fact]
-    public async Task AwsStorageProvider_MethodsThrowNotImplemented()
+    public async Task AwsStorageProvider_SaveFileWithInvalidPath_ThrowsFileNotFoundException()
     {
         // Arrange
         var provider = new AwsStorageProvider("test-bucket", "us-east-1");
         
-        // Act & Assert
-        await Assert.ThrowsAsync<NotImplementedException>(() => provider.SaveFileAsync("source", "dest"));
-        await Assert.ThrowsAsync<NotImplementedException>(() => provider.SaveFileAsync(new byte[0], "dest"));
-        await Assert.ThrowsAsync<NotImplementedException>(() => provider.FileExistsAsync("test"));
+        // Act & Assert - Now that AWS S3 is implemented, it should throw FileNotFoundException for missing files
+        await Assert.ThrowsAsync<FileNotFoundException>(() => provider.SaveFileAsync("source", "dest"));
+        
+        // These should work fine (content-based saves don't require source files)
+        await Assert.ThrowsAsync<ArgumentException>(() => provider.SaveFileAsync(Array.Empty<byte>(), "dest"));
+        
+        // This would require AWS credentials to actually work, so it will throw an exception
+        // but not NotImplementedException anymore since it's fully implemented
+        var ex = await Assert.ThrowsAnyAsync<Exception>(() => provider.FileExistsAsync("test"));
+        Assert.IsNotType<NotImplementedException>(ex);
     }
     
     [Fact]

@@ -15,12 +15,8 @@ public class AwsStorageProviderIntegrationTests
     [Fact]
     public void CreateProvider_WithValidAwsConfig_ShouldReturnAwsStorageProvider()
     {
-        // Arrange
-        var loggerFactory = new Mock<ILoggerFactory>();
-        var logger = new Mock<ILogger<AwsStorageProvider>>();
-        loggerFactory.Setup(f => f.CreateLogger<AwsStorageProvider>()).Returns(logger.Object);
-        
-        var factory = new StorageProviderFactory(loggerFactory.Object);
+        // Arrange - Use simpler setup without extension method mocking
+        var factory = new StorageProviderFactory();
         var config = new StorageConfig
         {
             Provider = "AWS",
@@ -47,12 +43,8 @@ public class AwsStorageProviderIntegrationTests
     [Fact]
     public void CreateProvider_WithAwsConfigAndCredentials_ShouldReturnAwsStorageProvider()
     {
-        // Arrange
-        var loggerFactory = new Mock<ILoggerFactory>();
-        var logger = new Mock<ILogger<AwsStorageProvider>>();
-        loggerFactory.Setup(f => f.CreateLogger<AwsStorageProvider>()).Returns(logger.Object);
-        
-        var factory = new StorageProviderFactory(loggerFactory.Object);
+        // Arrange - Use simpler setup without extension method mocking
+        var factory = new StorageProviderFactory();
         var config = new StorageConfig
         {
             Provider = "aws", // Test case insensitive

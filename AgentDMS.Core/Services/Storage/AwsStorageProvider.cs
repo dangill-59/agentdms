@@ -33,8 +33,14 @@ public class AwsStorageProvider : IStorageProvider, IDisposable
         if (config == null)
             throw new ArgumentNullException(nameof(config));
         
-        _bucketName = config.BucketName ?? throw new ArgumentException("BucketName is required", nameof(config));
-        _region = config.Region ?? throw new ArgumentException("Region is required", nameof(config));
+        if (string.IsNullOrEmpty(config.BucketName))
+            throw new ArgumentException("BucketName is required", nameof(config));
+            
+        if (string.IsNullOrEmpty(config.Region))
+            throw new ArgumentException("Region is required", nameof(config));
+        
+        _bucketName = config.BucketName;
+        _region = config.Region;
         _logger = logger;
         
         // Create S3 client with configuration
@@ -50,7 +56,14 @@ public class AwsStorageProvider : IStorageProvider, IDisposable
         if (!string.IsNullOrEmpty(config.AccessKeyId) && !string.IsNullOrEmpty(config.SecretAccessKey))
         {
             // Use explicit credentials if provided
-            _s3Client = new AmazonS3Client(config.AccessKeyId, config.SecretAccessKey, config.SessionToken, s3Config);
+            if (!string.IsNullOrEmpty(config.SessionToken))
+            {
+                _s3Client = new AmazonS3Client(config.AccessKeyId, config.SecretAccessKey, config.SessionToken, s3Config);
+            }
+            else
+            {
+                _s3Client = new AmazonS3Client(config.AccessKeyId, config.SecretAccessKey, s3Config);
+            }
         }
         else
         {
