@@ -52,7 +52,7 @@ public class StorageProviderFactory
             throw new ArgumentException("AWS Region is required for AWS storage provider");
 
         var logger = _loggerFactory?.CreateLogger<AwsStorageProvider>();
-        return new AwsStorageProvider(config.BucketName, config.Region, logger);
+        return new AwsStorageProvider(config, logger);
     }
 
     private IStorageProvider CreateAzureProvider(AzureStorageConfig config)
