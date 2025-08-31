@@ -141,15 +141,135 @@ The changes are **backward compatible**:
 - Default behavior remains the same (local temp directory)
 - Legacy constructors preserved for `ImageProcessingService`
 
+## AWS S3 Storage (Available)
+
+AWS S3 storage is now fully implemented and ready for production use.
+
+### Configuration
+
+#### Basic Configuration (appsettings.json)
+```json
+{
+  "Storage": {
+    "Provider": "AWS",
+    "Aws": {
+      "BucketName": "my-document-bucket",
+      "Region": "us-east-1"
+    }
+  }
+}
+```
+
+#### With Explicit Credentials
+```json
+{
+  "Storage": {
+    "Provider": "AWS",
+    "Aws": {
+      "BucketName": "my-document-bucket",
+      "Region": "us-east-1",
+      "AccessKeyId": "YOUR_ACCESS_KEY",
+      "SecretAccessKey": "YOUR_SECRET_KEY"
+    }
+  }
+}
+```
+
+#### With Temporary Credentials
+```json
+{
+  "Storage": {
+    "Provider": "AWS",
+    "Aws": {
+      "BucketName": "my-document-bucket",
+      "Region": "us-east-1",
+      "AccessKeyId": "YOUR_ACCESS_KEY",
+      "SecretAccessKey": "YOUR_SECRET_KEY",
+      "SessionToken": "YOUR_SESSION_TOKEN"
+    }
+  }
+}
+```
+
+### Credential Management
+
+The AWS S3 storage provider supports multiple credential sources (in order of precedence):
+
+1. **Explicit credentials** in configuration (AccessKeyId + SecretAccessKey)
+2. **Environment variables**: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`
+3. **AWS credentials file** (`~/.aws/credentials`)
+4. **IAM roles** (when running on EC2, ECS, Lambda, etc.)
+5. **EC2 instance metadata service**
+
+For production deployments, IAM roles are recommended for security.
+
+### Environment Variable Configuration
+
+Set these environment variables instead of storing credentials in configuration files:
+
+```bash
+export AWS_ACCESS_KEY_ID=your_access_key
+export AWS_SECRET_ACCESS_KEY=your_secret_key
+export AWS_DEFAULT_REGION=us-east-1
+```
+
+### Features
+
+- ✅ **File Upload**: Support for file path, byte array, and stream uploads
+- ✅ **File Download**: Generate S3 URLs for file access
+- ✅ **File Management**: Check existence, delete files, list files in directories
+- ✅ **Cleanup**: Automatic cleanup of old files based on age
+- ✅ **Security**: Server-side encryption (AES256) enabled by default
+- ✅ **Error Handling**: Comprehensive error handling and logging
+- ✅ **Content Types**: Automatic content type detection based on file extensions
+
+### S3 Bucket Requirements
+
+Your S3 bucket should have:
+
+1. **Proper IAM permissions** for the user/role:
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {
+         "Effect": "Allow",
+         "Action": [
+           "s3:GetObject",
+           "s3:PutObject",
+           "s3:DeleteObject",
+           "s3:ListBucket"
+         ],
+         "Resource": [
+           "arn:aws:s3:::your-bucket-name",
+           "arn:aws:s3:::your-bucket-name/*"
+         ]
+       }
+     ]
+   }
+   ```
+
+2. **CORS configuration** (if accessing from web applications):
+   ```json
+   [
+     {
+       "AllowedHeaders": ["*"],
+       "AllowedMethods": ["GET", "PUT", "POST", "DELETE"],
+       "AllowedOrigins": ["*"],
+       "ExposeHeaders": []
+     }
+   ]
+   ```
+
 ## Future Enhancements
 
-To fully implement cloud storage providers:
+To further enhance cloud storage providers:
 
-1. **AWS S3**: Add AWS SDK packages and implement actual S3 operations
+1. **~AWS S3~**: ✅ **Completed** - Full S3 operations implemented
 2. **Azure Blob**: Add Azure Storage packages and implement blob operations
 3. **Hybrid Storage**: Support different providers for different file types
 4. **Caching**: Add local caching for cloud-stored files
-5. **Security**: Implement proper authentication and authorization
+5. **Advanced Security**: Implement custom encryption and access controls
 
 ## Security Considerations
 
@@ -157,3 +277,5 @@ To fully implement cloud storage providers:
 - Use IAM roles and managed identities when possible
 - Implement proper access controls for cloud storage
 - Consider encryption at rest and in transit
+- **AWS S3**: Server-side encryption is enabled by default (AES256)
+- **Bucket policies**: Restrict access to specific IP ranges or VPCs when possible

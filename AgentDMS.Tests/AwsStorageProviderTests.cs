@@ -124,7 +124,7 @@ public class AwsStorageProviderTests : IDisposable
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(() => 
-            provider.SaveFileAsync(null!, "test.txt"));
+            provider.SaveFileAsync((byte[])null!, "test.txt"));
     }
 
     [Fact]
