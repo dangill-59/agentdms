@@ -115,7 +115,7 @@ public class OcrTests : IDisposable
         if (method == null)
             throw new InvalidOperationException("ExtractTextFromDocumentAsync method not found");
 
-        var task = method.Invoke(_service, new object[] { processingResult, cancellationToken }) as Task<string>;
+        var task = method.Invoke(_service, new object[] { processingResult, cancellationToken, false }) as Task<string>;
         if (task == null)
             throw new InvalidOperationException("Method invocation failed");
             
@@ -130,6 +130,43 @@ public class OcrTests : IDisposable
         image.Mutate(ctx => ctx.Fill(Color.White));
 
         await image.SaveAsPngAsync(imagePath);
+    }
+
+    [Fact]
+    public async Task ProcessImageAsync_WithOcrDisabled_ShouldSkipTextExtraction()
+    {
+        // Arrange
+        var testImagePath = Path.Combine(_tempDirectory, "test_image.png");
+        await CreateTestImageWithText(testImagePath, "Sample text for OCR");
+        
+        // Act
+        var result = await _service.ProcessImageAsync(testImagePath, null, CancellationToken.None, false, false, false);
+        
+        // Assert
+        Assert.True(result.Success);
+        Assert.NotNull(result.ProcessedImage);
+        
+        // When OCR is disabled, ExtractedText should be null or empty
+        Assert.True(string.IsNullOrEmpty(result.ExtractedText));
+    }
+
+    [Fact]
+    public async Task ProcessImageAsync_WithOcrEnabled_ShouldExtractText()
+    {
+        // Arrange
+        var testImagePath = Path.Combine(_tempDirectory, "test_image.png");
+        await CreateTestImageWithText(testImagePath, "Sample text for OCR");
+        
+        // Act
+        var result = await _service.ProcessImageAsync(testImagePath, null, CancellationToken.None, false, false, true);
+        
+        // Assert
+        Assert.True(result.Success);
+        Assert.NotNull(result.ProcessedImage);
+        
+        // When OCR is enabled, ExtractedText should not be null (even if no text is found, there should be a message)
+        Assert.NotNull(result.ExtractedText);
+        Assert.NotEmpty(result.ExtractedText);
     }
 
     public void Dispose()
