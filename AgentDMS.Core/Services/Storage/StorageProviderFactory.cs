@@ -39,7 +39,8 @@ public class StorageProviderFactory
     private IStorageProvider CreateLocalProvider(LocalStorageConfig config)
     {
         var logger = _loggerFactory?.CreateLogger<LocalStorageProvider>();
-        return new LocalStorageProvider(config.BaseDirectory, logger);
+        var baseDirectory = string.IsNullOrWhiteSpace(config.BaseDirectory) ? null : config.BaseDirectory;
+        return new LocalStorageProvider(baseDirectory, logger);
     }
 
     private IStorageProvider CreateAwsProvider(AwsStorageConfig config)
