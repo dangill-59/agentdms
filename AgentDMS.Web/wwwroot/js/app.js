@@ -96,6 +96,10 @@ function bindEventHandlers() {
     document.getElementById('mistralConfigForm').addEventListener('submit', saveMistralConfig);
     document.getElementById('testConfigBtn').addEventListener('click', testMistralConfig);
     document.getElementById('mistralTemperature').addEventListener('input', updateTemperatureDisplay);
+    
+    // OCR enable/disable checkboxes
+    document.getElementById('enableOcr').addEventListener('change', handleOcrToggle);
+    document.getElementById('batchEnableOcr').addEventListener('change', handleBatchOcrToggle);
 }
 
 // Initialize image zoom controls
@@ -370,6 +374,10 @@ async function handleUpload(event) {
         const useMistralAI = document.getElementById('useMistralAI').checked;
         formData.append('useMistralAI', useMistralAI.toString());
         
+        // Add OCR enable flag
+        const enableOcr = document.getElementById('enableOcr').checked;
+        formData.append('enableOcr', enableOcr.toString());
+        
         // Add Mistral OCR flag
         const useMistralOcr = document.getElementById('useMistralOcr').checked;
         formData.append('useMistralOcr', useMistralOcr.toString());
@@ -502,6 +510,7 @@ async function handleBatchProcess(event) {
         // Get Mistral processing flags
         const useMistralAI = document.getElementById('batchUseMistralAI').checked;
         const useMistralOcr = document.getElementById('batchUseMistralOcr').checked;
+        const enableOcr = document.getElementById('batchEnableOcr').checked;
         
         const response = await fetch('/api/imageprocessing/batch-process', {
             method: 'POST',
@@ -511,7 +520,8 @@ async function handleBatchProcess(event) {
             body: JSON.stringify({ 
                 filePaths: finalFilePaths,
                 useMistralAI: useMistralAI,
-                useMistralOcr: useMistralOcr
+                useMistralOcr: useMistralOcr,
+                enableOcr: enableOcr
             })
         });
         
@@ -1993,6 +2003,34 @@ function updateTemperatureDisplay() {
     const temperatureSlider = document.getElementById('mistralTemperature');
     const temperatureValue = document.getElementById('temperatureValue');
     temperatureValue.textContent = temperatureSlider.value;
+}
+
+// Handle OCR enable/disable toggle for single upload
+function handleOcrToggle() {
+    const enableOcr = document.getElementById('enableOcr').checked;
+    const ocrOptions = document.getElementById('ocrOptions');
+    const useMistralOcr = document.getElementById('useMistralOcr');
+    
+    if (enableOcr) {
+        ocrOptions.style.display = 'block';
+    } else {
+        ocrOptions.style.display = 'none';
+        useMistralOcr.checked = false;
+    }
+}
+
+// Handle OCR enable/disable toggle for batch processing
+function handleBatchOcrToggle() {
+    const enableOcr = document.getElementById('batchEnableOcr').checked;
+    const ocrOptions = document.getElementById('batchOcrOptions');
+    const useMistralOcr = document.getElementById('batchUseMistralOcr');
+    
+    if (enableOcr) {
+        ocrOptions.style.display = 'block';
+    } else {
+        ocrOptions.style.display = 'none';
+        useMistralOcr.checked = false;
+    }
 }
 
 // Scanner functionality

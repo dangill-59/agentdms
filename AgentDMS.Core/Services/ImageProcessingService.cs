@@ -50,7 +50,7 @@ public class ImageProcessingService
     /// <summary>
     /// Process a single image file asynchronously
     /// </summary>
-    public async Task<ProcessingResult> ProcessImageAsync(string filePath, DetailedProgressReporter? progressReporter = null, CancellationToken cancellationToken = default, bool useMistralAI = false, bool useMistralOcr = false)
+    public async Task<ProcessingResult> ProcessImageAsync(string filePath, DetailedProgressReporter? progressReporter = null, CancellationToken cancellationToken = default, bool useMistralAI = false, bool useMistralOcr = false, bool enableOcr = true)
     {
         await _semaphore.WaitAsync(cancellationToken);
         
@@ -127,7 +127,7 @@ public class ImageProcessingService
                 result.Metrics = metrics;
                 
                 // Optimize OCR and AI processing based on configuration
-                await OptimizeTextExtractionAndAnalysisAsync(result, progressReporter, cancellationToken, useMistralOcr, useMistralAI, fileName);
+                await OptimizeTextExtractionAndAnalysisAsync(result, progressReporter, cancellationToken, useMistralOcr, useMistralAI, enableOcr, fileName);
                 
                 if (progressReporter != null)
                     await progressReporter.ReportProgress(fileName, ProgressStatus.Completed, "Processing completed successfully");
@@ -157,7 +157,8 @@ public class ImageProcessingService
         IProgress<int>? progress = null,
         CancellationToken cancellationToken = default,
         bool useMistralAI = false,
-        bool useMistralOcr = false)
+        bool useMistralOcr = false,
+        bool enableOcr = true)
     {
         var filePathsList = filePaths.ToList();
         var results = new List<ProcessingResult>();
@@ -192,7 +193,7 @@ public class ImageProcessingService
                     });
                 }
                 
-                var result = await ProcessImageAsync(filePath, fileProgressReporter, cancellationToken, useMistralAI, useMistralOcr);
+                var result = await ProcessImageAsync(filePath, fileProgressReporter, cancellationToken, useMistralAI, useMistralOcr, enableOcr);
                 
                 Interlocked.Increment(ref processedCount);
                 progress?.Report(processedCount);
@@ -763,8 +764,20 @@ public class ImageProcessingService
         CancellationToken cancellationToken, 
         bool useMistralOcr, 
         bool useMistralAI, 
+        bool enableOcr,
         string fileName)
     {
+        // If OCR is disabled, only do AI analysis if requested
+        if (!enableOcr)
+        {
+            if (useMistralAI && _mistralService != null)
+            {
+                // Perform AI analysis without OCR text
+                await PerformAiAnalysisAsync(result, progressReporter, cancellationToken);
+            }
+            return;
+        }
+        
         // Scenario 1: Both OCR and AI analysis needed with Mistral OCR
         // We can do OCR and let AI analysis wait for the text
         if (useMistralOcr && useMistralAI && _mistralOcrService != null && _mistralService != null)
@@ -790,7 +803,7 @@ public class ImageProcessingService
             catch (Exception ex)
             {
                 _logger?.LogWarning(ex, "Optimized processing failed for {FileName}, falling back to individual operations", fileName);
-                await FallbackToSequentialProcessing(result, progressReporter, cancellationToken, useMistralOcr, useMistralAI, fileName);
+                await FallbackToSequentialProcessing(result, progressReporter, cancellationToken, useMistralOcr, useMistralAI, enableOcr, fileName);
             }
         }
         // Scenario 2: Only OCR needed
@@ -818,7 +831,7 @@ public class ImageProcessingService
         // Scenario 3: Both needed but with traditional OCR (we could potentially parallelize if we had cached text)
         else
         {
-            await FallbackToSequentialProcessing(result, progressReporter, cancellationToken, useMistralOcr, useMistralAI, fileName);
+            await FallbackToSequentialProcessing(result, progressReporter, cancellationToken, useMistralOcr, useMistralAI, enableOcr, fileName);
         }
     }
 
@@ -831,27 +844,31 @@ public class ImageProcessingService
         CancellationToken cancellationToken, 
         bool useMistralOcr, 
         bool useMistralAI, 
+        bool enableOcr,
         string fileName)
     {
-        // Always extract OCR text for UI display
-        try
+        // Extract OCR text only if OCR is enabled
+        if (enableOcr)
         {
-            if (progressReporter != null)
-                await progressReporter.ReportProgress(fileName, ProgressStatus.ProcessingFile, "Extracting text (OCR)...");
-            
-            var extractedText = await ExtractTextFromDocumentAsync(result, cancellationToken, useMistralOcr);
-            result.ExtractedText = extractedText;
-            
-            if (!string.IsNullOrWhiteSpace(extractedText))
+            try
             {
-                _logger?.LogInformation("Extracted {TextLength} characters of text from {FileName}", 
-                    extractedText.Length, fileName);
+                if (progressReporter != null)
+                    await progressReporter.ReportProgress(fileName, ProgressStatus.ProcessingFile, "Extracting text (OCR)...");
+                
+                var extractedText = await ExtractTextFromDocumentAsync(result, cancellationToken, useMistralOcr);
+                result.ExtractedText = extractedText;
+                
+                if (!string.IsNullOrWhiteSpace(extractedText))
+                {
+                    _logger?.LogInformation("Extracted {TextLength} characters of text from {FileName}", 
+                        extractedText.Length, fileName);
+                }
             }
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogWarning(ex, "OCR text extraction failed for {FileName}", fileName);
-            // Don't fail the entire processing pipeline if OCR fails
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "OCR text extraction failed for {FileName}", fileName);
+                // Don't fail the entire processing pipeline if OCR fails
+            }
         }
         
         // Perform AI analysis if Mistral service is available and user requested it

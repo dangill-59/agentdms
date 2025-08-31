@@ -22,6 +22,7 @@ public class ProcessingJob
     public string FilePath { get; set; } = string.Empty;
     public bool UseMistralAI { get; set; } = false;
     public bool UseMistralOcr { get; set; } = false;
+    public bool EnableOcr { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public JobStatus Status { get; set; } = JobStatus.Queued;
     public string? ErrorMessage { get; set; }
@@ -44,7 +45,7 @@ public enum JobStatus
 /// </summary>
 public interface IBackgroundJobService
 {
-    Task<string> EnqueueJobAsync(string filePath, bool useMistralAI = false, bool useMistralOcr = false);
+    Task<string> EnqueueJobAsync(string filePath, bool useMistralAI = false, bool useMistralOcr = false, bool enableOcr = true);
     Task<ProcessingJob?> GetJobStatusAsync(string jobId);
     Task<ProcessingResult?> GetJobResultAsync(string jobId);
 }
@@ -71,7 +72,7 @@ public class BackgroundJobService : BackgroundService, IBackgroundJobService
         _logger = logger;
     }
 
-    public Task<string> EnqueueJobAsync(string filePath, bool useMistralAI = false, bool useMistralOcr = false)
+    public Task<string> EnqueueJobAsync(string filePath, bool useMistralAI = false, bool useMistralOcr = false, bool enableOcr = true)
     {
         var jobId = Guid.NewGuid().ToString();
         var job = new ProcessingJob
@@ -80,6 +81,7 @@ public class BackgroundJobService : BackgroundService, IBackgroundJobService
             FilePath = filePath,
             UseMistralAI = useMistralAI,
             UseMistralOcr = useMistralOcr,
+            EnableOcr = enableOcr,
             CreatedAt = DateTime.UtcNow,
             Status = JobStatus.Queued
         };
@@ -88,8 +90,8 @@ public class BackgroundJobService : BackgroundService, IBackgroundJobService
         _jobQueue.Enqueue(job);
         _queueSemaphore.Release();
 
-        _logger.LogInformation("Enqueued job {JobId} for file {FilePath} with Mistral AI: {UseMistralAI}, Mistral OCR: {UseMistralOcr}", 
-            jobId, filePath, useMistralAI, useMistralOcr);
+        _logger.LogInformation("Enqueued job {JobId} for file {FilePath} with Mistral AI: {UseMistralAI}, Mistral OCR: {UseMistralOcr}, Enable OCR: {EnableOcr}", 
+            jobId, filePath, useMistralAI, useMistralOcr, enableOcr);
         return Task.FromResult(jobId);
     }
 
@@ -136,7 +138,7 @@ public class BackgroundJobService : BackgroundService, IBackgroundJobService
             });
 
             // Process the image
-            var result = await _imageProcessingService.ProcessImageAsync(job.FilePath, progressReporter, cancellationToken, job.UseMistralAI, job.UseMistralOcr);
+            var result = await _imageProcessingService.ProcessImageAsync(job.FilePath, progressReporter, cancellationToken, job.UseMistralAI, job.UseMistralOcr, job.EnableOcr);
 
             job.Result = result;
             job.Status = result.Success ? JobStatus.Completed : JobStatus.Failed;
