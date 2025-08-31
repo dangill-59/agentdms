@@ -20,11 +20,13 @@ public class LocalStorageProvider : IStorageProvider
     /// <summary>
     /// Initialize local storage provider with specified base directory
     /// </summary>
-    /// <param name="baseDirectory">Base directory for file storage. If null, uses temp directory.</param>
+    /// <param name="baseDirectory">Base directory for file storage. If null or empty, uses temp directory.</param>
     /// <param name="logger">Optional logger</param>
     public LocalStorageProvider(string? baseDirectory = null, ILogger<LocalStorageProvider>? logger = null)
     {
-        _baseDirectory = baseDirectory ?? Path.Combine(Path.GetTempPath(), "AgentDMS_Output");
+        _baseDirectory = string.IsNullOrWhiteSpace(baseDirectory) 
+            ? Path.Combine(Path.GetTempPath(), "AgentDMS_Output")
+            : baseDirectory;
         _logger = logger;
         
         // Ensure base directory exists
