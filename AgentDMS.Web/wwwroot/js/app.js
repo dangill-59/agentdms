@@ -16,6 +16,9 @@ async function init() {
     // Load Mistral configuration
     loadMistralConfig();
     
+    // Load Storage configuration
+    loadStorageConfig();
+    
     // Initialize scanner functionality
     await initializeScannerInterface();
     
@@ -96,6 +99,13 @@ function bindEventHandlers() {
     document.getElementById('mistralConfigForm').addEventListener('submit', saveMistralConfig);
     document.getElementById('testConfigBtn').addEventListener('click', testMistralConfig);
     document.getElementById('mistralTemperature').addEventListener('input', updateTemperatureDisplay);
+    
+    // Storage configuration form
+    document.getElementById('storageConfigForm').addEventListener('submit', saveStorageConfig);
+    document.getElementById('testStorageConfigBtn').addEventListener('click', testStorageConfig);
+    document.getElementById('storageProvider').addEventListener('change', function(e) {
+        updateStorageProviderVisibility(e.target.value);
+    });
     
     // OCR enable/disable checkboxes
     document.getElementById('enableOcr').addEventListener('change', handleOcrToggle);
@@ -2576,5 +2586,174 @@ function showFullOcrText(ocrId) {
         if (expandBtn) {
             expandBtn.style.display = 'none';
         }
+    }
+}
+
+// Storage Configuration Functions
+async function loadStorageConfig() {
+    try {
+        const config = await apiCall('storageconfig');
+        populateStorageForm(config);
+        updateStorageProviderVisibility(config.provider);
+    } catch (error) {
+        console.error('Error loading storage config:', error);
+        showStorageStatus('Error loading configuration', 'error');
+    }
+}
+
+function populateStorageForm(config) {
+    // Set provider
+    document.getElementById('storageProvider').value = config.provider || 'Local';
+    
+    // Local storage settings
+    document.getElementById('localBaseDirectory').value = config.local?.baseDirectory || '';
+    
+    // AWS storage settings
+    document.getElementById('awsBucketName').value = config.aws?.bucketName || '';
+    document.getElementById('awsRegion').value = config.aws?.region || 'us-east-1';
+    document.getElementById('awsAccessKeyId').value = config.aws?.accessKeyId || '';
+    document.getElementById('awsSecretAccessKey').value = config.aws?.secretAccessKey || '';
+    document.getElementById('awsSessionToken').value = config.aws?.sessionToken || '';
+    
+    // Azure storage settings
+    document.getElementById('azureAccountName').value = config.azure?.accountName || '';
+    document.getElementById('azureContainerName').value = config.azure?.containerName || 'agentdms';
+    document.getElementById('azureAccountKey').value = config.azure?.accountKey || '';
+    document.getElementById('azureConnectionString').value = config.azure?.connectionString || '';
+}
+
+function updateStorageProviderVisibility(provider) {
+    // Hide all storage settings
+    document.getElementById('localStorageSettings').style.display = 'none';
+    document.getElementById('awsStorageSettings').style.display = 'none';
+    document.getElementById('azureStorageSettings').style.display = 'none';
+    
+    // Show selected provider settings
+    switch (provider) {
+        case 'Local':
+            document.getElementById('localStorageSettings').style.display = 'block';
+            break;
+        case 'AWS':
+            document.getElementById('awsStorageSettings').style.display = 'block';
+            break;
+        case 'Azure':
+            document.getElementById('azureStorageSettings').style.display = 'block';
+            break;
+    }
+}
+
+async function saveStorageConfig(event) {
+    event.preventDefault();
+    
+    const form = document.getElementById('storageConfigForm');
+    const formData = new FormData(form);
+    
+    const config = {
+        provider: formData.get('provider'),
+        local: {
+            baseDirectory: formData.get('local.baseDirectory') || null
+        },
+        aws: {
+            bucketName: formData.get('aws.bucketName') || '',
+            region: formData.get('aws.region') || 'us-east-1',
+            accessKeyId: formData.get('aws.accessKeyId') || null,
+            secretAccessKey: formData.get('aws.secretAccessKey') || null,
+            sessionToken: formData.get('aws.sessionToken') || null
+        },
+        azure: {
+            accountName: formData.get('azure.accountName') || '',
+            containerName: formData.get('azure.containerName') || 'agentdms',
+            accountKey: formData.get('azure.accountKey') || null,
+            connectionString: formData.get('azure.connectionString') || null
+        }
+    };
+    
+    try {
+        await apiCall('storageconfig', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(config)
+        });
+        
+        showStorageStatus('Configuration saved successfully!', 'success');
+    } catch (error) {
+        console.error('Error saving storage config:', error);
+        showStorageStatus('Error saving configuration', 'error');
+    }
+}
+
+async function testStorageConfig() {
+    const form = document.getElementById('storageConfigForm');
+    const formData = new FormData(form);
+    
+    const config = {
+        provider: formData.get('provider'),
+        local: {
+            baseDirectory: formData.get('local.baseDirectory') || null
+        },
+        aws: {
+            bucketName: formData.get('aws.bucketName') || '',
+            region: formData.get('aws.region') || 'us-east-1',
+            accessKeyId: formData.get('aws.accessKeyId') || null,
+            secretAccessKey: formData.get('aws.secretAccessKey') || null,
+            sessionToken: formData.get('aws.sessionToken') || null
+        },
+        azure: {
+            accountName: formData.get('azure.accountName') || '',
+            containerName: formData.get('azure.containerName') || 'agentdms',
+            accountKey: formData.get('azure.accountKey') || null,
+            connectionString: formData.get('azure.connectionString') || null
+        }
+    };
+    
+    const testBtn = document.getElementById('testStorageConfigBtn');
+    const originalText = testBtn.innerHTML;
+    
+    try {
+        testBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Testing...';
+        testBtn.disabled = true;
+        
+        const result = await apiCall('storageconfig/test', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(config)
+        });
+        
+        if (result.success) {
+            showStorageStatus(result.message, 'success');
+        } else {
+            showStorageStatus(result.message, 'error');
+        }
+    } catch (error) {
+        console.error('Error testing storage config:', error);
+        showStorageStatus('Error testing configuration: ' + error.message, 'error');
+    } finally {
+        testBtn.innerHTML = originalText;
+        testBtn.disabled = false;
+    }
+}
+
+function showStorageStatus(message, type) {
+    const statusDiv = document.getElementById('storageStatus');
+    const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
+    const icon = type === 'success' ? 'bi-check-circle' : 'bi-exclamation-triangle';
+    
+    statusDiv.innerHTML = `
+        <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+            <i class="bi ${icon}"></i> ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    `;
+    statusDiv.style.display = 'block';
+    
+    // Auto-hide success messages after 5 seconds
+    if (type === 'success') {
+        setTimeout(() => {
+            statusDiv.style.display = 'none';
+        }, 5000);
     }
 }
