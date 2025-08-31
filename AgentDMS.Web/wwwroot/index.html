@@ -48,6 +48,9 @@
                         <button class="nav-link" id="mistral-tab" data-bs-toggle="tab" data-bs-target="#mistral" type="button" role="tab">
                             <i class="bi bi-gear"></i> Mistral Settings
                         </button>
+                        <button class="nav-link" id="output-tab" data-bs-toggle="tab" data-bs-target="#output" type="button" role="tab">
+                            <i class="bi bi-hdd"></i> Output Settings
+                        </button>
                     </nav>
                 </div>
             </div>
@@ -659,6 +662,147 @@
                                     
                                     <!-- Status Messages -->
                                     <div id="mistralStatus" class="mt-3" style="display: none;">
+                                        <!-- Success/error messages will be shown here -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Output Settings Tab -->
+                <div class="tab-pane fade" id="output" role="tabpanel">
+                    <div class="row justify-content-center">
+                        <div class="col-md-8">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="bi bi-hdd"></i> Output Storage Configuration</h5>
+                                </div>
+                                <div class="card-body">
+                                    <form id="storageConfigForm">
+                                        <div class="mb-3">
+                                            <label for="storageProvider" class="form-label">Storage Provider</label>
+                                            <select class="form-select" id="storageProvider" name="provider" required>
+                                                <option value="Local">Local File System</option>
+                                                <option value="AWS">Amazon S3</option>
+                                                <option value="Azure">Azure Blob Storage</option>
+                                            </select>
+                                            <div class="form-text">Choose where to store processed files and output.</div>
+                                        </div>
+
+                                        <!-- Local Storage Settings -->
+                                        <div id="localStorageSettings" class="storage-settings">
+                                            <h6 class="mb-3"><i class="bi bi-folder"></i> Local Storage Settings</h6>
+                                            <div class="mb-3">
+                                                <label for="localBaseDirectory" class="form-label">Base Directory</label>
+                                                <input type="text" class="form-control" id="localBaseDirectory" name="local.baseDirectory" placeholder="Leave empty for default temp directory">
+                                                <div class="form-text">
+                                                    Specify a custom directory for file storage. If empty, uses system temp directory + "AgentDMS_Output".
+                                                    <br><strong>Example:</strong> /home/user/agentdms-files or C:\AgentDMS\Output
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- AWS S3 Settings -->
+                                        <div id="awsStorageSettings" class="storage-settings" style="display: none;">
+                                            <h6 class="mb-3"><i class="bi bi-cloud"></i> Amazon S3 Settings</h6>
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label for="awsBucketName" class="form-label">Bucket Name</label>
+                                                        <input type="text" class="form-control" id="awsBucketName" name="aws.bucketName" placeholder="my-agentdms-bucket" required>
+                                                        <div class="form-text">S3 bucket name for storing files.</div>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label for="awsRegion" class="form-label">Region</label>
+                                                        <select class="form-select" id="awsRegion" name="aws.region" required>
+                                                            <option value="us-east-1">US East (N. Virginia)</option>
+                                                            <option value="us-west-1">US West (N. California)</option>
+                                                            <option value="us-west-2">US West (Oregon)</option>
+                                                            <option value="eu-west-1">Europe (Ireland)</option>
+                                                            <option value="eu-central-1">Europe (Frankfurt)</option>
+                                                            <option value="ap-southeast-1">Asia Pacific (Singapore)</option>
+                                                            <option value="ap-northeast-1">Asia Pacific (Tokyo)</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label for="awsAccessKeyId" class="form-label">Access Key ID</label>
+                                                        <input type="text" class="form-control" id="awsAccessKeyId" name="aws.accessKeyId" placeholder="Optional - can use environment variable">
+                                                        <div class="form-text">AWS Access Key ID. Can also be set via AWS_ACCESS_KEY_ID environment variable.</div>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label for="awsSecretAccessKey" class="form-label">Secret Access Key</label>
+                                                        <input type="password" class="form-control" id="awsSecretAccessKey" name="aws.secretAccessKey" placeholder="Optional - can use environment variable">
+                                                        <div class="form-text">AWS Secret Access Key. Can also be set via AWS_SECRET_ACCESS_KEY environment variable.</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="awsSessionToken" class="form-label">Session Token (Optional)</label>
+                                                <input type="text" class="form-control" id="awsSessionToken" name="aws.sessionToken" placeholder="For temporary credentials only">
+                                                <div class="form-text">AWS Session Token for temporary credentials (STS).</div>
+                                            </div>
+                                            <div class="alert alert-info">
+                                                <i class="bi bi-info-circle"></i>
+                                                <strong>Note:</strong> AWS S3 storage is currently a placeholder implementation. Full functionality will be available in a future release.
+                                            </div>
+                                        </div>
+
+                                        <!-- Azure Blob Settings -->
+                                        <div id="azureStorageSettings" class="storage-settings" style="display: none;">
+                                            <h6 class="mb-3"><i class="bi bi-cloud"></i> Azure Blob Storage Settings</h6>
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label for="azureAccountName" class="form-label">Storage Account Name</label>
+                                                        <input type="text" class="form-control" id="azureAccountName" name="azure.accountName" placeholder="mystorageaccount" required>
+                                                        <div class="form-text">Azure storage account name.</div>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label for="azureContainerName" class="form-label">Container Name</label>
+                                                        <input type="text" class="form-control" id="azureContainerName" name="azure.containerName" value="agentdms" required>
+                                                        <div class="form-text">Blob container name for storing files.</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="azureAccountKey" class="form-label">Account Key</label>
+                                                <input type="password" class="form-control" id="azureAccountKey" name="azure.accountKey" placeholder="Optional - can use environment variable or connection string">
+                                                <div class="form-text">Azure storage account key. Can also be set via AZURE_STORAGE_KEY environment variable.</div>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="azureConnectionString" class="form-label">Connection String (Alternative)</label>
+                                                <textarea class="form-control" id="azureConnectionString" name="azure.connectionString" rows="2" placeholder="DefaultEndpointsProtocol=https;AccountName=..."></textarea>
+                                                <div class="form-text">Azure storage connection string (alternative to account name and key).</div>
+                                            </div>
+                                            <div class="alert alert-info">
+                                                <i class="bi bi-info-circle"></i>
+                                                <strong>Note:</strong> Azure Blob storage is currently a placeholder implementation. Full functionality will be available in a future release.
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="d-flex gap-2">
+                                            <button type="submit" class="btn btn-primary">
+                                                <i class="bi bi-floppy"></i> Save Configuration
+                                            </button>
+                                            <button type="button" class="btn btn-outline-secondary" id="testStorageConfigBtn">
+                                                <i class="bi bi-check-circle"></i> Test Configuration
+                                            </button>
+                                        </div>
+                                    </form>
+                                    
+                                    <!-- Status Messages -->
+                                    <div id="storageStatus" class="mt-3" style="display: none;">
                                         <!-- Success/error messages will be shown here -->
                                     </div>
                                 </div>

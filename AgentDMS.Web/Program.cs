@@ -126,6 +126,9 @@ builder.Services.AddSingleton<IScannerService, ScannerService>();
 // Add Mistral Configuration Service
 builder.Services.AddSingleton<IMistralConfigService, MistralConfigService>();
 
+// Add Storage Configuration Service
+builder.Services.AddSingleton<IStorageConfigService, StorageConfigService>();
+
 // Add Mistral Document AI Service (optional - only if API key is configured)
 // Configuration example:
 // Set environment variable: MISTRAL_API_KEY=your_api_key_here
