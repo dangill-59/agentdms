@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Threading.Tasks;
 using AgentDMS.Core.Services;
+using AgentDMS.Core.Services.Storage;
 using AgentDMS.Core.Utilities;
 using AgentDMS.Core.Models;
 
@@ -19,9 +20,18 @@ class Program
         Console.WriteLine();
 
         _options = CliOptions.Parse(args);
+        
+        // Create storage service based on CLI options
+        var storageConfig = _options.ToStorageConfig();
+        var storageFactory = new StorageProviderFactory();
+        var storageProvider = storageFactory.CreateProvider(storageConfig);
+        var storageService = new StorageService(
+            Microsoft.Extensions.Options.Options.Create(storageConfig), 
+            storageFactory);
+        
         _imageProcessor = new ImageProcessingService(
-            maxConcurrency: _options.MaxConcurrency, 
-            outputDirectory: _options.OutputDirectory);
+            storageService: storageService,
+            maxConcurrency: _options.MaxConcurrency);
 
         if (args.Length == 0)
         {
@@ -724,6 +734,13 @@ class Program
         Console.WriteLine("  -t, --thumbnail-size <pixels>     Thumbnail size in pixels (default: 200, range: 50-1000)");
         Console.WriteLine("  -b, --benchmark <file>             Benchmark ImageSharp vs Magick.NET performance");
         Console.WriteLine("      --no-metrics                  Disable metrics logging");
+        Console.WriteLine();
+        Console.WriteLine("Storage Options:");
+        Console.WriteLine("      --storage-provider <type>     Storage provider: Local, AWS, Azure (default: Local)");
+        Console.WriteLine("      --aws-bucket <name>           AWS S3 bucket name (required for AWS)");
+        Console.WriteLine("      --aws-region <region>         AWS region (default: us-east-1)");
+        Console.WriteLine("      --azure-account <name>        Azure storage account name (required for Azure)");
+        Console.WriteLine("      --azure-container <name>      Azure container name (default: agentdms)");
         Console.WriteLine();
         Console.WriteLine("Environment Variables:");
         Console.WriteLine("  AGENTDMS_MAX_CONCURRENCY          Set max concurrency");

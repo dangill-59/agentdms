@@ -1,4 +1,6 @@
 using AgentDMS.Core.Services;
+using AgentDMS.Core.Services.Storage;
+using AgentDMS.Core.Models;
 using AgentDMS.Web.Hubs;
 using AgentDMS.Web.Services;
 using Microsoft.OpenApi.Models;
@@ -100,6 +102,11 @@ builder.Services.AddSignalR();
 
 // Add Upload Configuration Service
 builder.Services.AddSingleton<IUploadConfigService, UploadConfigService>();
+
+// Configure Storage services
+builder.Services.Configure<StorageConfig>(builder.Configuration.GetSection("Storage"));
+builder.Services.AddSingleton<StorageProviderFactory>();
+builder.Services.AddSingleton<IStorageService, StorageService>();
 
 // Add AgentDMS Core services with configurable file upload service
 builder.Services.AddSingleton<FileUploadService>(provider =>
@@ -205,10 +212,11 @@ builder.Services.AddSingleton<ImageProcessingService>(provider =>
     var logger = provider.GetService<ILogger<ImageProcessingService>>();
     var mistralService = provider.GetService<MistralDocumentAiService>();
     var mistralOcrService = provider.GetService<MistralOcrService>();
+    var storageService = provider.GetRequiredService<IStorageService>();
     
     return new ImageProcessingService(
+        storageService: storageService,
         maxConcurrency: 4, 
-        outputDirectory: null, 
         logger: logger, 
         mistralService: mistralService,
         mistralOcrService: mistralOcrService);
@@ -268,16 +276,21 @@ else
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 
-// Configure static file serving for AgentDMS_Output directory
-var outputDirectory = Path.Combine(Path.GetTempPath(), "AgentDMS_Output");
-Directory.CreateDirectory(outputDirectory);
-app.UseStaticFiles(new StaticFileOptions
+// Configure static file serving for local storage only
+var storageService = app.Services.GetRequiredService<IStorageService>();
+if (storageService.StorageProvider is LocalStorageProvider localProvider)
 {
-    FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(outputDirectory),
-    RequestPath = "/AgentDMS_Output"
-});
+    // For local storage, serve files directly from the storage directory
+    var outputDirectory = localProvider.BaseDirectory;
+    Directory.CreateDirectory(outputDirectory);
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(outputDirectory),
+        RequestPath = "/AgentDMS_Output"
+    });
+}
 
-// Configure static file serving for AgentDMS_Scans directory
+// Configure static file serving for AgentDMS_Scans directory (this remains local for now)
 var scansDirectory = Path.Combine(Path.GetTempPath(), "AgentDMS_Scans");
 Directory.CreateDirectory(scansDirectory);
 app.UseStaticFiles(new StaticFileOptions
