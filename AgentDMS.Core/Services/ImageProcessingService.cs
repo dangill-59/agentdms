@@ -10,6 +10,7 @@ using SixLabors.ImageSharp.Processing;
 using ImageMagick;
 using Microsoft.Extensions.Logging;
 using AgentDMS.Core.Models;
+using AgentDMS.Core.Services.Storage;
 
 namespace AgentDMS.Core.Services;
 
@@ -20,11 +21,38 @@ public class ImageProcessingService
 {
     private readonly SemaphoreSlim _semaphore;
     private readonly string _outputDirectory;
+    private readonly IStorageService? _storageService;
     private readonly ILogger<ImageProcessingService>? _logger;
     private readonly MistralDocumentAiService? _mistralService;
     private readonly MistralOcrService? _mistralOcrService;
     private readonly PerformanceCache _cache;
 
+    /// <summary>
+    /// Constructor for dependency injection with storage service
+    /// </summary>
+    public ImageProcessingService(
+        IStorageService storageService,
+        int maxConcurrency = 4,
+        ILogger<ImageProcessingService>? logger = null,
+        MistralDocumentAiService? mistralService = null,
+        MistralOcrService? mistralOcrService = null,
+        PerformanceCache? cache = null)
+    {
+        _semaphore = new SemaphoreSlim(maxConcurrency);
+        _storageService = storageService ?? throw new ArgumentNullException(nameof(storageService));
+        _outputDirectory = GetOutputDirectory();
+        _logger = logger;
+        _mistralService = mistralService;
+        _mistralOcrService = mistralOcrService;
+        _cache = cache ?? new PerformanceCache(logger);
+        
+        // Initialize Magick.NET
+        MagickNET.Initialize();
+    }
+
+    /// <summary>
+    /// Legacy constructor for backward compatibility
+    /// </summary>
     public ImageProcessingService(
         int maxConcurrency = 4, 
         string? outputDirectory = null, 
@@ -35,16 +63,28 @@ public class ImageProcessingService
     {
         _semaphore = new SemaphoreSlim(maxConcurrency);
         _outputDirectory = outputDirectory ?? Path.Combine(Path.GetTempPath(), "AgentDMS_Output");
+        _storageService = null; // Legacy mode uses local storage directly
         _logger = logger;
         _mistralService = mistralService;
         _mistralOcrService = mistralOcrService;
         _cache = cache ?? new PerformanceCache(logger);
         
-        // Ensure output directory exists
+        // Ensure output directory exists for legacy mode
         Directory.CreateDirectory(_outputDirectory);
         
         // Initialize Magick.NET
         MagickNET.Initialize();
+    }
+
+    private string GetOutputDirectory()
+    {
+        if (_storageService?.StorageProvider is LocalStorageProvider localProvider)
+        {
+            return localProvider.BaseDirectory;
+        }
+        
+        // For cloud storage providers, use a temp directory for intermediate processing
+        return Path.Combine(Path.GetTempPath(), "AgentDMS_Processing");
     }
 
     /// <summary>
@@ -234,12 +274,17 @@ public class ImageProcessingService
             var conversionStart = DateTime.UtcNow;
             var pngPath = Path.Combine(_outputDirectory, $"{Path.GetFileNameWithoutExtension(imageFile.FileName)}.png");
             await image.SaveAsPngAsync(pngPath, cancellationToken);
-            imageFile.ConvertedPngPath = pngPath;
+            
+            // Save to storage provider if configured
+            var relativePath = $"{Path.GetFileNameWithoutExtension(imageFile.FileName)}.png";
+            var storedPath = await SaveFileAsync(pngPath, relativePath);
+            
+            imageFile.ConvertedPngPath = storedPath;
             metrics.ConversionTime = DateTime.UtcNow - conversionStart;
 
-            // Use the PNG file directly instead of generating a thumbnail
+            // Use the stored file directly instead of generating a thumbnail
             var thumbnailStart = DateTime.UtcNow;
-            imageFile.ThumbnailPath = pngPath; // Point to the PNG file directly
+            imageFile.ThumbnailPath = storedPath; // Point to the stored file directly
             metrics.ThumbnailGenerationTime = DateTime.UtcNow - thumbnailStart;
 
             _logger?.LogDebug("Successfully processed single image: {FilePath}", imageFile.OriginalFilePath);
@@ -300,17 +345,22 @@ public class ImageProcessingService
                 // Convert to PNG using ImageMagick
                 magickImage.Format = MagickFormat.Png;
                 await magickImage.WriteAsync(pagePath, cancellationToken);
-                imageFile.SplitPagePaths.Add(pagePath);
+                
+                // Save to storage provider if configured
+                var relativePath = $"{Path.GetFileNameWithoutExtension(imageFile.FileName)}_page_{frame + 1}.png";
+                var storedPath = await SaveFileAsync(pagePath, relativePath);
+                
+                imageFile.SplitPagePaths.Add(storedPath);
 
                 // Create ImageFile for each page
                 var pageImage = new ImageFile
                 {
-                    OriginalFilePath = pagePath,
+                    OriginalFilePath = storedPath,
                     FileName = Path.GetFileName(pagePath),
                     OriginalFormat = ".tiff",
                     Width = (int)magickImage.Width,
                     Height = (int)magickImage.Height,
-                    ConvertedPngPath = pagePath,
+                    ConvertedPngPath = storedPath,
                     IsMultiPage = false,
                     PageCount = 1
                 };
@@ -403,25 +453,30 @@ public class ImageProcessingService
                 magickImage.BackgroundColor = MagickColors.White;
                 
                 await magickImage.WriteAsync(pagePath, cancellationToken);
-                imageFile.SplitPagePaths.Add(pagePath);
+                
+                // Save to storage provider if configured
+                var relativePath = $"{Path.GetFileNameWithoutExtension(imageFile.FileName)}_page_{pageNum + 1}.png";
+                var storedPath = await SaveFileAsync(pagePath, relativePath);
+                
+                imageFile.SplitPagePaths.Add(storedPath);
 
                 // Create a proper ImageFile entry for each page
                 var pageImage = new ImageFile
                 {
-                    OriginalFilePath = pagePath,
+                    OriginalFilePath = storedPath,
                     FileName = Path.GetFileName(pagePath),
                     OriginalFormat = ".pdf",
                     Width = (int)magickImage.Width,
                     Height = (int)magickImage.Height,
-                    ConvertedPngPath = pagePath,
+                    ConvertedPngPath = storedPath,
                     IsMultiPage = false,
                     PageCount = 1,
                     FileSize = new FileInfo(pagePath).Length,
                     CreatedDate = DateTime.UtcNow
                 };
 
-                // Use PNG file directly instead of generating thumbnails
-                pageImage.ThumbnailPath = pagePath; // Use the converted PNG directly
+                // Use stored file directly instead of generating thumbnails
+                pageImage.ThumbnailPath = storedPath; // Use the stored PNG directly
                 
                 splitPages.Add(pageImage);
                 _logger?.LogDebug("Generated page {PageNumber} for PDF: {PagePath}", pageNum + 1, pagePath);
@@ -876,6 +931,24 @@ public class ImageProcessingService
         {
             await PerformAiAnalysisAsync(result, progressReporter, cancellationToken);
         }
+    }
+
+    /// <summary>
+    /// Save a file using the configured storage provider
+    /// </summary>
+    /// <param name="filePath">Local file path to save</param>
+    /// <param name="relativePath">Relative path in storage</param>
+    /// <returns>The URL or path where the file can be accessed</returns>
+    private async Task<string> SaveFileAsync(string filePath, string relativePath)
+    {
+        if (_storageService?.StorageProvider != null)
+        {
+            // Use the configured storage provider
+            return await _storageService.StorageProvider.SaveFileAsync(filePath, relativePath);
+        }
+        
+        // Legacy mode: file is already in the correct location
+        return filePath;
     }
 
     /// <summary>

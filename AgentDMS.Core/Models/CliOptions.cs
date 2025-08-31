@@ -17,6 +17,13 @@ public class CliOptions
     public int ThumbnailSize { get; set; } = 200;
     public bool EnableMetricsLogging { get; set; } = true;
     public string? BenchmarkFile { get; set; }
+    
+    // Storage configuration options
+    public string StorageProvider { get; set; } = "Local";
+    public string? AwsBucketName { get; set; }
+    public string? AwsRegion { get; set; }
+    public string? AzureAccountName { get; set; }
+    public string? AzureContainerName { get; set; }
 
     public static CliOptions Parse(string[] args)
     {
@@ -108,9 +115,83 @@ public class CliOptions
                         options.BenchmarkFile = args[++i];
                     }
                     break;
+                    
+                case "--storage-provider":
+                    if (i + 1 < args.Length)
+                    {
+                        options.StorageProvider = args[++i];
+                    }
+                    break;
+                    
+                case "--aws-bucket":
+                    if (i + 1 < args.Length)
+                    {
+                        options.AwsBucketName = args[++i];
+                    }
+                    break;
+                    
+                case "--aws-region":
+                    if (i + 1 < args.Length)
+                    {
+                        options.AwsRegion = args[++i];
+                    }
+                    break;
+                    
+                case "--azure-account":
+                    if (i + 1 < args.Length)
+                    {
+                        options.AzureAccountName = args[++i];
+                    }
+                    break;
+                    
+                case "--azure-container":
+                    if (i + 1 < args.Length)
+                    {
+                        options.AzureContainerName = args[++i];
+                    }
+                    break;
             }
         }
 
         return options;
+    }
+    
+    /// <summary>
+    /// Create a StorageConfig from CLI options
+    /// </summary>
+    public StorageConfig ToStorageConfig()
+    {
+        var config = new StorageConfig
+        {
+            Provider = StorageProvider
+        };
+        
+        // Configure local storage
+        if (!string.IsNullOrEmpty(OutputDirectory))
+        {
+            config.Local.BaseDirectory = OutputDirectory;
+        }
+        
+        // Configure AWS storage
+        if (!string.IsNullOrEmpty(AwsBucketName))
+        {
+            config.Aws.BucketName = AwsBucketName;
+        }
+        if (!string.IsNullOrEmpty(AwsRegion))
+        {
+            config.Aws.Region = AwsRegion;
+        }
+        
+        // Configure Azure storage
+        if (!string.IsNullOrEmpty(AzureAccountName))
+        {
+            config.Azure.AccountName = AzureAccountName;
+        }
+        if (!string.IsNullOrEmpty(AzureContainerName))
+        {
+            config.Azure.ContainerName = AzureContainerName;
+        }
+        
+        return config;
     }
 }
