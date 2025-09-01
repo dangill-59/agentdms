@@ -144,12 +144,12 @@ public class LocalStorageProvider : IStorageProvider
         return GetFullPath(relativePath);
     }
 
-    public async Task CleanupOldFilesAsync(string directoryPath, TimeSpan maxAge)
+    public Task CleanupOldFilesAsync(string directoryPath, TimeSpan maxAge)
     {
         var fullDirectoryPath = GetFullPath(directoryPath);
         
         if (!Directory.Exists(fullDirectoryPath))
-            return;
+            return Task.CompletedTask;
 
         var cutoffTime = DateTime.UtcNow - maxAge;
         var files = Directory.GetFiles(fullDirectoryPath, "*", SearchOption.AllDirectories);
@@ -170,6 +170,8 @@ public class LocalStorageProvider : IStorageProvider
                 _logger?.LogWarning(ex, "Failed to clean up file: {File}", file);
             }
         }
+        
+        return Task.CompletedTask;
     }
 
     /// <summary>
