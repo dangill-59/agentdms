@@ -276,7 +276,7 @@ else
     });
 }
 
-// app.UseHttpsRedirection(); // Temporarily disabled for development
+app.UseHttpsRedirection();
 app.UseStaticFiles();
 
 // Configure static file serving for local storage only

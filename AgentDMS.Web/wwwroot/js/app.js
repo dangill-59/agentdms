@@ -107,6 +107,10 @@ function bindEventHandlers() {
         updateStorageProviderVisibility(e.target.value);
     });
     
+    // Set initial storage provider visibility (default to Local)
+    const initialProvider = document.getElementById('storageProvider').value || 'Local';
+    updateStorageProviderVisibility(initialProvider);
+    
     // OCR enable/disable checkboxes
     document.getElementById('enableOcr').addEventListener('change', handleOcrToggle);
     document.getElementById('batchEnableOcr').addEventListener('change', handleBatchOcrToggle);
@@ -2623,21 +2627,34 @@ function populateStorageForm(config) {
 }
 
 function updateStorageProviderVisibility(provider) {
-    // Hide all storage settings
+    // Hide all storage settings and remove required attributes
     document.getElementById('localStorageSettings').style.display = 'none';
     document.getElementById('awsStorageSettings').style.display = 'none';
     document.getElementById('azureStorageSettings').style.display = 'none';
     
-    // Show selected provider settings
+    // Remove required attributes from all provider fields
+    document.getElementById('awsBucketName').removeAttribute('required');
+    document.getElementById('awsRegion').removeAttribute('required');
+    document.getElementById('azureAccountName').removeAttribute('required');
+    document.getElementById('azureContainerName').removeAttribute('required');
+    
+    // Show selected provider settings and add required attributes
     switch (provider) {
         case 'Local':
             document.getElementById('localStorageSettings').style.display = 'block';
+            // Local storage has no required fields
             break;
         case 'AWS':
             document.getElementById('awsStorageSettings').style.display = 'block';
+            // Add required attributes for AWS fields
+            document.getElementById('awsBucketName').setAttribute('required', '');
+            document.getElementById('awsRegion').setAttribute('required', '');
             break;
         case 'Azure':
             document.getElementById('azureStorageSettings').style.display = 'block';
+            // Add required attributes for Azure fields
+            document.getElementById('azureAccountName').setAttribute('required', '');
+            document.getElementById('azureContainerName').setAttribute('required', '');
             break;
     }
 }
