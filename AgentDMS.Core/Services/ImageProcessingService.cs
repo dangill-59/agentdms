@@ -454,6 +454,13 @@ public class ImageProcessingService
                 
                 await magickImage.WriteAsync(pagePath, cancellationToken);
                 
+                // Ensure file is completely written and handle is released
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                
+                // Get file size with retry mechanism to handle potential file lock conflicts
+                long fileSize = await GetFileSizeWithRetryAsync(pagePath, cancellationToken);
+                
                 // Save to storage provider if configured
                 var relativePath = $"{Path.GetFileNameWithoutExtension(imageFile.FileName)}_page_{pageNum + 1}.png";
                 var storedPath = await SaveFileAsync(pagePath, relativePath);
@@ -471,7 +478,7 @@ public class ImageProcessingService
                     ConvertedPngPath = storedPath,
                     IsMultiPage = false,
                     PageCount = 1,
-                    FileSize = new FileInfo(pagePath).Length,
+                    FileSize = fileSize,
                     CreatedDate = DateTime.UtcNow
                 };
 
@@ -931,6 +938,55 @@ public class ImageProcessingService
         {
             await PerformAiAnalysisAsync(result, progressReporter, cancellationToken);
         }
+    }
+
+    /// <summary>
+    /// Get file size with retry mechanism to handle file locking issues
+    /// </summary>
+    /// <param name="filePath">Path to the file</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>File size in bytes</returns>
+    private async Task<long> GetFileSizeWithRetryAsync(string filePath, CancellationToken cancellationToken)
+    {
+        const int maxRetries = 5;
+        const int delayMs = 100;
+        
+        for (int attempt = 0; attempt < maxRetries; attempt++)
+        {
+            try
+            {
+                // Wait a bit before each attempt to allow file handles to be released
+                if (attempt > 0)
+                {
+                    await Task.Delay(delayMs * attempt, cancellationToken);
+                }
+                
+                var fileInfo = new FileInfo(filePath);
+                if (fileInfo.Exists)
+                {
+                    return fileInfo.Length;
+                }
+                else
+                {
+                    throw new FileNotFoundException($"File not found: {filePath}");
+                }
+            }
+            catch (IOException ex) when (attempt < maxRetries - 1)
+            {
+                _logger?.LogWarning("Attempt {Attempt} failed to access file {FilePath}: {Error}", 
+                    attempt + 1, filePath, ex.Message);
+                // Continue to next retry attempt
+            }
+            catch (UnauthorizedAccessException ex) when (attempt < maxRetries - 1)
+            {
+                _logger?.LogWarning("Attempt {Attempt} failed to access file {FilePath}: {Error}", 
+                    attempt + 1, filePath, ex.Message);
+                // Continue to next retry attempt
+            }
+        }
+        
+        // Final attempt without catching exceptions
+        return new FileInfo(filePath).Length;
     }
 
     /// <summary>
