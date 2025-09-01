@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
+using System.Linq;
 using AgentDMS.Core.Models;
 
 namespace AgentDMS.Core.Services;
@@ -159,6 +160,9 @@ public class BackgroundJobService : BackgroundService, IBackgroundJobService
                     _logger.LogWarning(ex, "Failed to delete temporary file {FilePath}", job.FilePath);
                 }
             }
+
+            // Clean up any temporary output files that might have been created during processing
+            await CleanupTemporaryOutputFilesAsync(job, result);
         }
         catch (Exception ex)
         {
@@ -174,6 +178,96 @@ public class BackgroundJobService : BackgroundService, IBackgroundJobService
                 StatusMessage = "Processing failed",
                 ErrorMessage = ex.Message
             });
+        }
+    }
+
+    /// <summary>
+    /// Clean up any temporary output files created during processing
+    /// </summary>
+    /// <param name="job">The processing job</param>
+    /// <param name="result">The processing result</param>
+    private async Task CleanupTemporaryOutputFilesAsync(ProcessingJob job, ProcessingResult result)
+    {
+        try
+        {
+            // If this was a PDF processing job and we created temporary PNG files, clean them up
+            if (result?.ProcessedImage?.SplitPagePaths?.Any() == true)
+            {
+                var tempPath = Path.GetTempPath();
+                var agentDmsOutputPath = Path.Combine(tempPath, "AgentDMS_Output");
+                
+                foreach (var pagePath in result.ProcessedImage.SplitPagePaths)
+                {
+                    // Only clean up files in temp directories
+                    if (!string.IsNullOrEmpty(pagePath) && pagePath.StartsWith(tempPath))
+                    {
+                        await DeleteFileWithRetryAsync(pagePath);
+                    }
+                }
+                
+                // Also clean up any remaining files in the AgentDMS_Output temp directory
+                if (Directory.Exists(agentDmsOutputPath))
+                {
+                    var tempFiles = Directory.GetFiles(agentDmsOutputPath, $"*{Path.GetFileNameWithoutExtension(job.FilePath)}*");
+                    foreach (var tempFile in tempFiles)
+                    {
+                        await DeleteFileWithRetryAsync(tempFile);
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to clean up temporary output files for job {JobId}", job.JobId);
+        }
+    }
+
+    /// <summary>
+    /// Delete a file with retry mechanism to handle file locking issues
+    /// </summary>
+    /// <param name="filePath">Path to the file to delete</param>
+    private async Task DeleteFileWithRetryAsync(string filePath)
+    {
+        if (!File.Exists(filePath))
+            return;
+
+        const int maxRetries = 3;
+        const int delayMs = 100;
+        
+        for (int attempt = 0; attempt < maxRetries; attempt++)
+        {
+            try
+            {
+                if (attempt > 0)
+                {
+                    await Task.Delay(delayMs * attempt);
+                }
+                
+                File.Delete(filePath);
+                _logger.LogDebug("Deleted temporary output file {FilePath}", filePath);
+                return;
+            }
+            catch (IOException ex) when (attempt < maxRetries - 1)
+            {
+                _logger.LogWarning("Attempt {Attempt} failed to delete file {FilePath}: {Error}", 
+                    attempt + 1, filePath, ex.Message);
+            }
+            catch (UnauthorizedAccessException ex) when (attempt < maxRetries - 1)
+            {
+                _logger.LogWarning("Attempt {Attempt} failed to delete file {FilePath}: {Error}", 
+                    attempt + 1, filePath, ex.Message);
+            }
+        }
+        
+        // Final attempt - let any exception bubble up to be logged by the caller
+        try
+        {
+            File.Delete(filePath);
+            _logger.LogDebug("Deleted temporary output file {FilePath}", filePath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Final attempt failed to delete temporary file {FilePath}", filePath);
         }
     }
 }
