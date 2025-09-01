@@ -1,0 +1,19 @@
+{
+  "provider": "Local",
+  "local": {
+    "baseDirectory": null
+  },
+  "aws": {
+    "bucketName": "",
+    "region": "us-east-1",
+    "accessKeyId": null,
+    "secretAccessKey": null,
+    "sessionToken": null
+  },
+  "azure": {
+    "accountName": "",
+    "containerName": "agentdms",
+    "accountKey": null,
+    "connectionString": null
+  }
+}
