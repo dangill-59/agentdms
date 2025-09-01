@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using AgentDMS.Core.Models;
+using AgentDMS.Core.Services.Storage;
 using AgentDMS.Web.Services;
 using Swashbuckle.AspNetCore.Annotations;
 
@@ -163,12 +164,80 @@ public class StorageConfigController : ControllerBase
     }
 
     /// <summary>
-    /// Test AWS storage configuration (placeholder)
+    /// Test AWS storage configuration
     /// </summary>
     private async Task<ActionResult> TestAwsStorage(StorageConfig config)
     {
-        await Task.Delay(1); // Avoid async warning
-        return BadRequest(new { success = false, message = "AWS storage testing not yet implemented" });
+        try
+        {
+            _logger.LogInformation("Testing AWS storage configuration for bucket: {BucketName}", config.Aws.BucketName);
+            
+            // Create the AWS storage provider with the provided configuration
+            using var awsProvider = new AwsStorageProvider(config.Aws);
+            
+            // Test basic connectivity by attempting to list objects (this will validate credentials and bucket access)
+            await awsProvider.ListFilesAsync("");
+            
+            // Test write permissions by creating a small test file
+            var testPath = $"agentdms-test/{Guid.NewGuid()}.txt";
+            var testContent = System.Text.Encoding.UTF8.GetBytes($"AgentDMS connectivity test - {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC");
+            
+            var savedPath = await awsProvider.SaveFileAsync(testContent, testPath, "text/plain");
+            
+            // Verify the file exists
+            var fileExists = await awsProvider.FileExistsAsync(testPath);
+            if (!fileExists)
+            {
+                return BadRequest(new { success = false, message = "Failed to verify test file creation in AWS S3" });
+            }
+            
+            // Clean up the test file
+            await awsProvider.DeleteFileAsync(testPath);
+            
+            _logger.LogInformation("AWS storage test successful for bucket: {BucketName}", config.Aws.BucketName);
+            
+            return Ok(new { 
+                success = true, 
+                message = "AWS storage test successful", 
+                bucket = config.Aws.BucketName,
+                region = config.Aws.Region,
+                testFile = savedPath
+            });
+        }
+        catch (Amazon.S3.AmazonS3Exception s3Ex)
+        {
+            _logger.LogError(s3Ex, "AWS S3 error during storage test: {ErrorCode}", s3Ex.ErrorCode);
+            
+            return s3Ex.ErrorCode switch
+            {
+                "NoSuchBucket" => BadRequest(new { success = false, message = $"AWS S3 bucket '{config.Aws.BucketName}' does not exist", errorCode = s3Ex.ErrorCode }),
+                "AccessDenied" => BadRequest(new { success = false, message = "Access denied to AWS S3 bucket. Check your credentials and permissions", errorCode = s3Ex.ErrorCode }),
+                "InvalidAccessKeyId" => BadRequest(new { success = false, message = "Invalid AWS access key ID", errorCode = s3Ex.ErrorCode }),
+                "SignatureDoesNotMatch" => BadRequest(new { success = false, message = "Invalid AWS secret access key", errorCode = s3Ex.ErrorCode }),
+                "InvalidBucketName" => BadRequest(new { success = false, message = $"Invalid AWS S3 bucket name: {config.Aws.BucketName}", errorCode = s3Ex.ErrorCode }),
+                _ => BadRequest(new { success = false, message = $"AWS S3 error: {s3Ex.Message}", errorCode = s3Ex.ErrorCode, details = s3Ex.ToString() })
+            };
+        }
+        catch (Amazon.Runtime.AmazonServiceException awsEx)
+        {
+            _logger.LogError(awsEx, "AWS service error during storage test");
+            return BadRequest(new { success = false, message = $"AWS service error: {awsEx.Message}", errorCode = awsEx.ErrorCode });
+        }
+        catch (Amazon.Runtime.AmazonClientException clientEx)
+        {
+            _logger.LogError(clientEx, "AWS client error during storage test");
+            return BadRequest(new { success = false, message = $"AWS connection error: {clientEx.Message}. Check your network connection and AWS region settings." });
+        }
+        catch (ArgumentException argEx)
+        {
+            _logger.LogError(argEx, "Invalid AWS configuration");
+            return BadRequest(new { success = false, message = $"Invalid AWS configuration: {argEx.Message}" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error during AWS storage test");
+            return BadRequest(new { success = false, message = "AWS storage test failed", details = ex.Message });
+        }
     }
 
     /// <summary>
