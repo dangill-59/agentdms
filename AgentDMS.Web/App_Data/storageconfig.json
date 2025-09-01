@@ -1,7 +1,7 @@
 {
   "provider": "Local",
   "local": {
-    "baseDirectory": "/tmp/test-storage"
+    "baseDirectory": "/tmp/fixed-local-storage"
   },
   "aws": {
     "bucketName": "",
