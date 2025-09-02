@@ -778,5 +778,11 @@ public class ImageProcessingServiceTests
             StorageProvider = provider;
             Configuration = new StorageConfig { Provider = "Local" };
         }
+
+        public Task RefreshProviderAsync()
+        {
+            // No-op for testing - the provider doesn't need to be refreshed
+            return Task.CompletedTask;
+        }
     }
 }

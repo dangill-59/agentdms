@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Moq;
 using AgentDMS.Core.Models;
+using AgentDMS.Core.Services;
 using AgentDMS.Web.Controllers;
 using AgentDMS.Web.Services;
 using Xunit;
@@ -19,7 +20,8 @@ public class AwsStorageTestImplementationTest
         // Arrange
         var loggerMock = new Mock<ILogger<StorageConfigController>>();
         var configServiceMock = new Mock<IStorageConfigService>();
-        var controller = new StorageConfigController(loggerMock.Object, configServiceMock.Object);
+        var storageServiceMock = new Mock<IStorageService>();
+        var controller = new StorageConfigController(loggerMock.Object, configServiceMock.Object, storageServiceMock.Object);
         
         var config = new StorageConfig
         {
@@ -64,7 +66,8 @@ public class AwsStorageTestImplementationTest
         // Arrange
         var loggerMock = new Mock<ILogger<StorageConfigController>>();
         var configServiceMock = new Mock<IStorageConfigService>();
-        var controller = new StorageConfigController(loggerMock.Object, configServiceMock.Object);
+        var storageServiceMock = new Mock<IStorageService>();
+        var controller = new StorageConfigController(loggerMock.Object, configServiceMock.Object, storageServiceMock.Object);
         
         var config = new StorageConfig
         {
