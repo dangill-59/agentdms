@@ -48,7 +48,19 @@ public class LocalStorageProvider : IStorageProvider
             Directory.CreateDirectory(destinationDirectory);
         }
 
-        await Task.Run(() => File.Copy(sourcePath, fullDestinationPath, overwrite: true));
+        // Check if source and destination are the same file (normalized paths)
+        var normalizedSource = Path.GetFullPath(sourcePath);
+        var normalizedDestination = Path.GetFullPath(fullDestinationPath);
+        
+        if (string.Equals(normalizedSource, normalizedDestination, StringComparison.OrdinalIgnoreCase))
+        {
+            // Source and destination are the same - no copy needed
+            _logger?.LogDebug("Source and destination are the same file, skipping copy: {FilePath}", normalizedSource);
+            return GetFileUrl(destinationPath);
+        }
+
+        // Use retry mechanism for file copy operations to handle file locking
+        await CopyFileWithRetryAsync(sourcePath, fullDestinationPath);
         
         _logger?.LogDebug("File copied from {SourcePath} to {DestinationPath}", sourcePath, fullDestinationPath);
         
@@ -196,4 +208,70 @@ public class LocalStorageProvider : IStorageProvider
     /// Get the base directory used by this storage provider
     /// </summary>
     public string BaseDirectory => _baseDirectory;
+
+    /// <summary>
+    /// Copy a file with retry mechanism to handle file locking issues
+    /// </summary>
+    /// <param name="sourcePath">Source file path</param>
+    /// <param name="destinationPath">Destination file path</param>
+    private async Task CopyFileWithRetryAsync(string sourcePath, string destinationPath)
+    {
+        const int maxRetries = 5;
+        const int baseDelayMs = 100;
+        
+        _logger?.LogDebug("Starting file copy with retry from {SourcePath} to {DestinationPath}", sourcePath, destinationPath);
+        
+        for (int attempt = 0; attempt < maxRetries; attempt++)
+        {
+            try
+            {
+                // Add delay before retry attempts to allow file handles to be released
+                if (attempt > 0)
+                {
+                    var delayMs = baseDelayMs * (int)Math.Pow(2, attempt - 1); // Exponential backoff
+                    _logger?.LogDebug("File copy retry attempt {Attempt} for {DestinationPath}, waiting {DelayMs}ms", 
+                        attempt + 1, destinationPath, delayMs);
+                    await Task.Delay(delayMs);
+                }
+                
+                // Attempt to copy the file
+                await Task.Run(() => File.Copy(sourcePath, destinationPath, overwrite: true));
+                
+                _logger?.LogDebug("Successfully copied file on attempt {Attempt}: {SourcePath} -> {DestinationPath}", 
+                    attempt + 1, sourcePath, destinationPath);
+                return; // Success - exit the retry loop
+            }
+            catch (IOException ex) when (attempt < maxRetries - 1 && IsFileLockException(ex))
+            {
+                _logger?.LogWarning("File lock detected during copy on attempt {Attempt} for {SourcePath}: {Error}. Retrying...", 
+                    attempt + 1, sourcePath, ex.Message);
+                // Continue to next retry attempt
+            }
+            catch (UnauthorizedAccessException ex) when (attempt < maxRetries - 1)
+            {
+                _logger?.LogWarning("Access denied during copy on attempt {Attempt} for {SourcePath}: {Error}. Retrying...", 
+                    attempt + 1, sourcePath, ex.Message);
+                // Continue to next retry attempt
+            }
+        }
+        
+        // Final attempt without catching exceptions - let it throw if it fails
+        _logger?.LogWarning("Final attempt to copy file after {MaxRetries} retries: {SourcePath} -> {DestinationPath}", 
+            maxRetries, sourcePath, destinationPath);
+        await Task.Run(() => File.Copy(sourcePath, destinationPath, overwrite: true));
+    }
+
+    /// <summary>
+    /// Determines if an IOException is likely due to file locking
+    /// </summary>
+    /// <param name="ex">The IOException to check</param>
+    /// <returns>True if the exception appears to be file lock related</returns>
+    private static bool IsFileLockException(IOException ex)
+    {
+        var message = ex.Message.ToLowerInvariant();
+        return message.Contains("being used by another process") ||
+               message.Contains("cannot access the file") ||
+               message.Contains("sharing violation") ||
+               message.Contains("lock");
+    }
 }
