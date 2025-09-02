@@ -194,7 +194,13 @@ public class BackgroundJobService : BackgroundService, IBackgroundJobService
             if (result?.ProcessedImage?.SplitPagePaths?.Any() == true)
             {
                 var tempPath = Path.GetTempPath();
-                var agentDmsOutputPath = Path.Combine(tempPath, "AgentDMS_Output");
+                
+                // Clean up files from both possible temp directories
+                var possibleTempDirs = new[]
+                {
+                    Path.Combine(tempPath, "AgentDMS_Output"),      // Legacy directory name
+                    Path.Combine(tempPath, "AgentDMS_Processing")   // Current directory name for cloud storage
+                };
                 
                 foreach (var pagePath in result.ProcessedImage.SplitPagePaths)
                 {
@@ -205,13 +211,16 @@ public class BackgroundJobService : BackgroundService, IBackgroundJobService
                     }
                 }
                 
-                // Also clean up any remaining files in the AgentDMS_Output temp directory
-                if (Directory.Exists(agentDmsOutputPath))
+                // Also clean up any remaining files in both temp directories
+                foreach (var tempDir in possibleTempDirs)
                 {
-                    var tempFiles = Directory.GetFiles(agentDmsOutputPath, $"*{Path.GetFileNameWithoutExtension(job.FilePath)}*");
-                    foreach (var tempFile in tempFiles)
+                    if (Directory.Exists(tempDir))
                     {
-                        await DeleteFileWithRetryAsync(tempFile);
+                        var tempFiles = Directory.GetFiles(tempDir, $"*{Path.GetFileNameWithoutExtension(job.FilePath)}*");
+                        foreach (var tempFile in tempFiles)
+                        {
+                            await DeleteFileWithRetryAsync(tempFile);
+                        }
                     }
                 }
             }
