@@ -207,7 +207,7 @@ function convertToHttpUrl(filePath) {
     }
     
     // Convert absolute file path to HTTP URL
-    // Check for both AgentDMS_Output and AgentDMS_Scans directories
+    // Check for both AgentDMS_Output and AgentDMS_Scans directories (legacy support)
     const outputFolders = ['AgentDMS_Output', 'AgentDMS_Scans'];
     
     for (const outputFolderName of outputFolders) {
@@ -215,13 +215,46 @@ function convertToHttpUrl(filePath) {
         
         if (outputIndex !== -1) {
             // Extract the relative path from the output folder onwards
-            // This handles both Windows (C:\...\AgentDMS_Scans\file.png) and Unix (/tmp/AgentDMS_Scans/file.png)
             const relativePath = filePath.substring(outputIndex);
             return '/' + relativePath.replace(/\\/g, '/'); // Normalize path separators
         }
     }
     
-    // Fallback: return empty string if we can't convert
+    // New approach: Check for any storage directory and map to /AgentDMS_Output/
+    // Look for common storage directory patterns
+    const storagePatterns = [
+        '/tmp/new-storage-folder',
+        '/tmp/AgentDMS_Output',
+        '/temp/AgentDMS_Output',
+        'AgentDMS_Output',
+        'new-storage-folder'
+    ];
+    
+    for (const pattern of storagePatterns) {
+        const patternIndex = filePath.indexOf(pattern);
+        if (patternIndex !== -1) {
+            // Extract the relative path after the storage directory
+            const afterPattern = filePath.substring(patternIndex + pattern.length);
+            const relativePath = afterPattern.startsWith('/') || afterPattern.startsWith('\\') 
+                ? afterPattern.substring(1) 
+                : afterPattern;
+            
+            if (relativePath) {
+                return '/AgentDMS_Output/' + relativePath.replace(/\\/g, '/');
+            }
+        }
+    }
+    
+    // Final fallback: if path looks like it's from a temp directory, 
+    // try to extract filename and serve from /AgentDMS_Output/
+    if (filePath.includes('/tmp/') || filePath.includes('\\temp\\')) {
+        const fileName = filePath.split(/[/\\]/).pop();
+        if (fileName) {
+            return '/AgentDMS_Output/' + fileName;
+        }
+    }
+    
+    // Last resort: return empty string if we can't convert
     console.warn('Could not convert file path to HTTP URL:', filePath);
     return '';
 }
@@ -1543,9 +1576,10 @@ function displayImagesInViewer(viewer, results, renderingTime) {
             
             // Add main image (PNG instead of thumbnail)
             if (img.convertedPngPath || img.thumbnailPath) {
+                const imagePath = img.convertedPngPath || img.thumbnailPath;
                 images.push({
                     name: img.fileName,
-                    path: img.convertedPngPath || img.thumbnailPath, // Use PNG file directly
+                    path: imagePath, // Use PNG file directly
                     processingTime: result.processingTime || '0ms',
                     renderingTime: result.renderingTime || '0ms',
                     isMain: true
