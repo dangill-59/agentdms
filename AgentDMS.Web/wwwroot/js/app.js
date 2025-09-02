@@ -731,13 +731,13 @@ function displayProcessingResult(container, result) {
                 <div class="row mt-3">
                     <div class="col-12">
                         <div class="file-info">
-                            <div class="file-name">${img.fileName}</div>
+                            <div class="file-name">${img.FileName}</div>
                             <small class="text-muted">
-                                Format: ${img.originalFormat} | 
-                                Size: ${formatFileSize(img.fileSize)} |
-                                Dimensions: ${img.width}×${img.height}px
+                                Format: ${img.OriginalFormat} | 
+                                Size: ${formatFileSize(img.FileSize)} |
+                                Dimensions: ${img.Width}×${img.Height}px
                             </small>
-                            ${img.isMultiPage ? `<br><small class="text-info">Multi-page document (${img.pageCount} pages)</small>` : ''}
+                            ${img.IsMultiPage ? `<br><small class="text-info">Multi-page document (${img.PageCount} pages)</small>` : ''}
                         </div>
                         
                         <!-- Detailed Timing Metrics -->
@@ -753,14 +753,14 @@ function displayProcessingResult(container, result) {
                             <div class="row">
                                 <div class="col-md-6">
                                     <small><strong>Processing Details:</strong></small>
-                                    ${img.convertedPngPath ? `<br><small>PNG Version: ${img.convertedPngPath}</small>` : ''}
+                                    ${img.ConvertedPngPath ? `<br><small>PNG Version: ${img.ConvertedPngPath}</small>` : ''}
                                 </div>
                                 <div class="col-md-6">
-                                    ${img.splitPagePaths && img.splitPagePaths.length > 0 ? `
+                                    ${img.SplitPagePaths && img.SplitPagePaths.length > 0 ? `
                                         <small><strong>Split Pages:</strong></small>
                                         <ul class="list-unstyled ms-3">
-                                            ${img.splitPagePaths.slice(0, 3).map(path => `<li><small>${path}</small></li>`).join('')}
-                                            ${img.splitPagePaths.length > 3 ? `<li><small>... and ${img.splitPagePaths.length - 3} more</small></li>` : ''}
+                                            ${img.SplitPagePaths.slice(0, 3).map(path => `<li><small>${path}</small></li>`).join('')}
+                                            ${img.SplitPagePaths.length > 3 ? `<li><small>... and ${img.SplitPagePaths.length - 3} more</small></li>` : ''}
                                         </ul>
                                     ` : ''}
                                 </div>
@@ -1082,13 +1082,13 @@ function displayBatchResults(container, results, totalBatchTime) {
                     <div class="row mt-3">
                         <div class="col-12">
                             <div class="file-info">
-                                <div class="file-name">${img.fileName}</div>
+                                <div class="file-name">${img.FileName}</div>
                                 <small class="text-muted">
-                                    Format: ${img.originalFormat} | 
-                                    Size: ${formatFileSize(img.fileSize)} |
-                                    Dimensions: ${img.width}×${img.height}px
+                                    Format: ${img.OriginalFormat} | 
+                                    Size: ${formatFileSize(img.FileSize)} |
+                                    Dimensions: ${img.Width}×${img.Height}px
                                 </small>
-                                ${img.isMultiPage ? `<br><small class="text-info">Multi-page document (${img.pageCount} pages)</small>` : ''}
+                                ${img.IsMultiPage ? `<br><small class="text-info">Multi-page document (${img.PageCount} pages)</small>` : ''}
                             </div>
                             
                             <!-- Detailed Timing Metrics -->
@@ -1104,14 +1104,14 @@ function displayBatchResults(container, results, totalBatchTime) {
                                 <div class="row">
                                     <div class="col-md-6">
                                         <small><strong>Processing Details:</strong></small>
-                                        ${img.convertedPngPath ? `<br><small>PNG Version: ${img.convertedPngPath}</small>` : ''}
+                                        ${img.ConvertedPngPath ? `<br><small>PNG Version: ${img.ConvertedPngPath}</small>` : ''}
                                     </div>
                                     <div class="col-md-6">
-                                        ${img.splitPagePaths && img.splitPagePaths.length > 0 ? `
+                                        ${img.SplitPagePaths && img.SplitPagePaths.length > 0 ? `
                                             <small><strong>Split Pages:</strong></small>
                                             <ul class="list-unstyled ms-3">
-                                                ${img.splitPagePaths.slice(0, 3).map(path => `<li><small>${path}</small></li>`).join('')}
-                                                ${img.splitPagePaths.length > 3 ? `<li><small>... and ${img.splitPagePaths.length - 3} more</small></li>` : ''}
+                                                ${img.SplitPagePaths.slice(0, 3).map(path => `<li><small>${path}</small></li>`).join('')}
+                                                ${img.SplitPagePaths.length > 3 ? `<li><small>... and ${img.SplitPagePaths.length - 3} more</small></li>` : ''}
                                             </ul>
                                         ` : ''}
                                     </div>
@@ -1129,7 +1129,7 @@ function displayBatchResults(container, results, totalBatchTime) {
                         <div class="d-flex justify-content-between align-items-start">
                             <div>
                                 <div class="file-name">
-                                    <i class="bi bi-x-circle"></i> File ${index + 1}: ${result.processedImage?.fileName || 'Unknown'}
+                                    <i class="bi bi-x-circle"></i> File ${index + 1}: ${result.processedImage?.FileName || 'Unknown'}
                                 </div>
                                 <small class="text-danger">${result.message}</small>
                             </div>
@@ -1575,10 +1575,10 @@ function displayImagesInViewer(viewer, results, renderingTime) {
             const img = result.processedImage;
             
             // Add main image (PNG instead of thumbnail)
-            if (img.convertedPngPath || img.thumbnailPath) {
-                const imagePath = img.convertedPngPath || img.thumbnailPath;
+            if (img.ConvertedPngPath || img.ThumbnailPath) {
+                const imagePath = img.ConvertedPngPath || img.ThumbnailPath;
                 images.push({
-                    name: img.fileName,
+                    name: img.FileName,
                     path: imagePath, // Use PNG file directly
                     processingTime: result.processingTime || '0ms',
                     renderingTime: result.renderingTime || '0ms',
@@ -1587,12 +1587,12 @@ function displayImagesInViewer(viewer, results, renderingTime) {
             }
             
             // Add split page images for multipage documents
-            if (img.isMultiPage && result.splitPages) {
+            if (img.IsMultiPage && result.splitPages) {
                 result.splitPages.forEach((page, pageIndex) => {
-                    if (page.convertedPngPath || page.thumbnailPath) {
+                    if (page.ConvertedPngPath || page.ThumbnailPath) {
                         images.push({
-                            name: `${img.fileName} - Page ${pageIndex + 1}`,
-                            path: page.convertedPngPath || page.thumbnailPath, // Use PNG file directly
+                            name: `${img.FileName} - Page ${pageIndex + 1}`,
+                            path: page.ConvertedPngPath || page.ThumbnailPath, // Use PNG file directly
                             processingTime: result.processingTime || '0ms',
                             renderingTime: result.renderingTime || '0ms',
                             isPage: true
