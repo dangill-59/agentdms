@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Moq;
 using AgentDMS.Core.Models;
+using AgentDMS.Core.Services;
 using AgentDMS.Web.Controllers;
 using AgentDMS.Web.Services;
 using Xunit;
@@ -21,7 +22,8 @@ public class StorageConfigControllerTests
     {
         _loggerMock = new Mock<ILogger<StorageConfigController>>();
         _configServiceMock = new Mock<IStorageConfigService>();
-        _controller = new StorageConfigController(_loggerMock.Object, _configServiceMock.Object);
+        var storageServiceMock = new Mock<IStorageService>();
+        _controller = new StorageConfigController(_loggerMock.Object, _configServiceMock.Object, storageServiceMock.Object);
     }
 
     [Fact]

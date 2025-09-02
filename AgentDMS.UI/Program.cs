@@ -25,9 +25,10 @@ class Program
         var storageConfig = _options.ToStorageConfig();
         var storageFactory = new StorageProviderFactory();
         var storageProvider = storageFactory.CreateProvider(storageConfig);
-        var storageService = new StorageService(
-            Microsoft.Extensions.Options.Options.Create(storageConfig), 
-            storageFactory);
+        
+        // Create a simple config provider for the UI that returns the static config
+        Func<Task<StorageConfig>> configProvider = () => Task.FromResult(storageConfig);
+        var storageService = new StorageService(storageFactory, configProvider);
         
         _imageProcessor = new ImageProcessingService(
             storageService: storageService,

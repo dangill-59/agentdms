@@ -103,10 +103,24 @@ builder.Services.AddSignalR();
 // Add Upload Configuration Service
 builder.Services.AddSingleton<IUploadConfigService, UploadConfigService>();
 
-// Configure Storage services
+// Configure Storage services - use runtime configuration via StorageConfigService
 builder.Services.Configure<StorageConfig>(builder.Configuration.GetSection("Storage"));
 builder.Services.AddSingleton<StorageProviderFactory>();
-builder.Services.AddSingleton<IStorageService, StorageService>();
+
+// Add Storage Configuration Service first
+builder.Services.AddSingleton<IStorageConfigService, StorageConfigService>();
+
+// Configure StorageService to use runtime configuration from StorageConfigService
+builder.Services.AddSingleton<IStorageService>(provider =>
+{
+    var factory = provider.GetRequiredService<StorageProviderFactory>();
+    var storageConfigService = provider.GetRequiredService<IStorageConfigService>();
+    
+    // Create a function that gets the current configuration from the config service
+    Func<Task<StorageConfig>> configProvider = async () => await storageConfigService.GetConfigAsync();
+    
+    return new StorageService(factory, configProvider);
+});
 
 // Add AgentDMS Core services with configurable file upload service
 builder.Services.AddSingleton<FileUploadService>(provider =>
@@ -127,7 +141,7 @@ builder.Services.AddSingleton<IScannerService, ScannerService>();
 builder.Services.AddSingleton<IMistralConfigService, MistralConfigService>();
 
 // Add Storage Configuration Service
-builder.Services.AddSingleton<IStorageConfigService, StorageConfigService>();
+// (Already added above in storage configuration section)
 
 // Add Mistral Document AI Service (optional - only if API key is configured)
 // Configuration example:

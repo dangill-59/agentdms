@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using AgentDMS.Core.Models;
 using AgentDMS.Core.Services.Storage;
+using AgentDMS.Core.Services;
 using AgentDMS.Web.Services;
 using Swashbuckle.AspNetCore.Annotations;
 
@@ -17,16 +18,19 @@ public class StorageConfigController : ControllerBase
 {
     private readonly ILogger<StorageConfigController> _logger;
     private readonly IStorageConfigService _configService;
+    private readonly IStorageService _storageService;
 
     /// <summary>
     /// Initializes a new instance of the StorageConfigController
     /// </summary>
     /// <param name="logger">Logger instance</param>
     /// <param name="configService">Storage configuration service</param>
-    public StorageConfigController(ILogger<StorageConfigController> logger, IStorageConfigService configService)
+    /// <param name="storageService">Storage service that needs to be refreshed when config changes</param>
+    public StorageConfigController(ILogger<StorageConfigController> logger, IStorageConfigService configService, IStorageService storageService)
     {
         _logger = logger;
         _configService = configService;
+        _storageService = storageService;
     }
 
     /// <summary>
@@ -81,6 +85,9 @@ public class StorageConfigController : ControllerBase
             }
 
             await _configService.UpdateConfigAsync(config);
+            
+            // Refresh the storage service to use the new configuration
+            await _storageService.RefreshProviderAsync();
 
             _logger.LogInformation("Storage configuration updated successfully");
             return Ok(config);
