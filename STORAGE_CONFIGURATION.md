@@ -9,7 +9,20 @@ AgentDMS now supports configurable output destinations with three storage provid
 
 ## Configuration
 
-### 1. Web Application (appsettings.json)
+Storage configuration is managed dynamically through the web interface. The application uses runtime configuration stored in `App_Data/storageconfig.json` which can be updated via the web API, ensuring that changes take effect immediately without requiring application restart.
+
+### Runtime Configuration (Primary)
+
+The storage configuration is managed through the web interface and stored in `App_Data/storageconfig.json`. This configuration takes precedence and is used by the actual storage operations.
+
+#### API Endpoints
+- **GET** `/api/storageconfig` - Get current storage configuration
+- **POST** `/api/storageconfig` - Update storage configuration
+- **POST** `/api/storageconfig/test` - Test storage configuration
+
+### Fallback Configuration (appsettings.json)
+
+The application also reads initial configuration from `appsettings.json`, but this is only used as a fallback when no runtime configuration exists.
 
 #### Local Storage (Default)
 ```json
@@ -140,6 +153,18 @@ The changes are **backward compatible**:
 - Existing code continues to work unchanged
 - Default behavior remains the same (local temp directory)
 - Legacy constructors preserved for `ImageProcessingService`
+
+### Storage Configuration Fix (September 2025)
+
+**Issue Fixed**: Storage settings configured through the web interface were not being used for actual file storage operations.
+
+**Root Cause**: The application had two separate storage configuration systems that didn't communicate:
+1. Static configuration from `appsettings.json` (used by storage operations)
+2. Runtime configuration from `App_Data/storageconfig.json` (updated by web interface)
+
+**Solution**: Modified the `StorageService` to use runtime configuration from `StorageConfigService`, ensuring that configuration changes made through the web interface are immediately applied to storage operations.
+
+**Verification**: Files are now saved to the correct location specified in the storage configuration.
 
 ## AWS S3 Storage (Available)
 
