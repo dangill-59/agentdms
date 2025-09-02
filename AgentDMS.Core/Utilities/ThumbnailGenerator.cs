@@ -25,7 +25,8 @@ public static class ThumbnailGenerator
         string inputPath, 
         string outputDirectory,
         string? customName = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? jobId = null)
     {
         if (!File.Exists(inputPath))
         {
@@ -35,6 +36,10 @@ public static class ThumbnailGenerator
         Directory.CreateDirectory(outputDirectory);
 
         var fileName = customName ?? Path.GetFileNameWithoutExtension(inputPath);
+        if (!string.IsNullOrEmpty(jobId))
+        {
+            fileName = customName != null ? $"{customName}_{jobId}" : $"{fileName}_{jobId}";
+        }
         var pngPath = Path.Combine(outputDirectory, $"{fileName}.png");
 
         // If input is already a PNG, just copy it to the output directory
@@ -70,10 +75,11 @@ public static class ThumbnailGenerator
         string outputDirectory,
         int size = 200, 
         string? customName = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? jobId = null)
     {
         // Simply convert to PNG instead of generating thumbnails
-        return await ConvertToPngAsync(inputPath, outputDirectory, customName, cancellationToken);
+        return await ConvertToPngAsync(inputPath, outputDirectory, customName, cancellationToken, jobId);
     }
 
     /// <summary>
@@ -83,7 +89,8 @@ public static class ThumbnailGenerator
         string inputPath,
         string outputDirectory,
         int[] sizes,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? jobId = null)
     {
         var results = new Dictionary<int, string>();
         
@@ -101,7 +108,7 @@ public static class ThumbnailGenerator
             var customName = $"{fileName}_{size}px";
             
             var pngPath = await ConvertToPngAsync(
-                inputPath, outputDirectory, customName, cancellationToken);
+                inputPath, outputDirectory, customName, cancellationToken, jobId);
             
             results[size] = pngPath;
         }
@@ -116,9 +123,10 @@ public static class ThumbnailGenerator
         string inputPath,
         string outputDirectory,
         int size = 200,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? jobId = null)
     {
-        var pngPath = await ConvertToPngAsync(inputPath, outputDirectory, cancellationToken: cancellationToken);
+        var pngPath = await ConvertToPngAsync(inputPath, outputDirectory, cancellationToken: cancellationToken, jobId: jobId);
         
         var fileName = Path.GetFileName(inputPath);
         var pngFileName = Path.GetFileName(pngPath);
@@ -148,7 +156,8 @@ public static class ThumbnailGenerator
         string outputDirectory,
         int thumbnailSize = 200,
         string title = "Image Gallery",
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? jobId = null)
     {
         Directory.CreateDirectory(outputDirectory);
         
@@ -156,7 +165,7 @@ public static class ThumbnailGenerator
         {
             try
             {
-                var pngPath = await ConvertToPngAsync(imagePath, outputDirectory, cancellationToken: cancellationToken);
+                var pngPath = await ConvertToPngAsync(imagePath, outputDirectory, cancellationToken: cancellationToken, jobId: jobId);
                 return new { ImagePath = imagePath, PngPath = pngPath, Success = true };
             }
             catch (Exception ex)

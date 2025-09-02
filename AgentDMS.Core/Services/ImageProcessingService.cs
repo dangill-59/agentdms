@@ -90,7 +90,7 @@ public class ImageProcessingService
     /// <summary>
     /// Process a single image file asynchronously
     /// </summary>
-    public async Task<ProcessingResult> ProcessImageAsync(string filePath, DetailedProgressReporter? progressReporter = null, CancellationToken cancellationToken = default, bool useMistralAI = false, bool useMistralOcr = false, bool enableOcr = true)
+    public async Task<ProcessingResult> ProcessImageAsync(string filePath, DetailedProgressReporter? progressReporter = null, CancellationToken cancellationToken = default, bool useMistralAI = false, bool useMistralOcr = false, bool enableOcr = true, string? jobId = null)
     {
         await _semaphore.WaitAsync(cancellationToken);
         
@@ -138,11 +138,11 @@ public class ImageProcessingService
             switch (extension)
             {
                 case ".pdf":
-                    result = await ProcessPdfAsync(imageFile, metrics, progressReporter, cancellationToken);
+                    result = await ProcessPdfAsync(imageFile, metrics, progressReporter, cancellationToken, jobId);
                     break;
                 case ".tif":
                 case ".tiff":
-                    result = await ProcessMultipageTiffAsync(imageFile, metrics, progressReporter, cancellationToken);
+                    result = await ProcessMultipageTiffAsync(imageFile, metrics, progressReporter, cancellationToken, jobId);
                     break;
                 case ".jpg":
                 case ".jpeg":
@@ -150,7 +150,7 @@ public class ImageProcessingService
                 case ".bmp":
                 case ".gif":
                 case ".webp":
-                    result = await ProcessSingleImageAsync(imageFile, metrics, progressReporter, cancellationToken);
+                    result = await ProcessSingleImageAsync(imageFile, metrics, progressReporter, cancellationToken, jobId);
                     break;
                 default:
                     if (progressReporter != null)
@@ -248,7 +248,7 @@ public class ImageProcessingService
         return results;
     }
 
-    private async Task<ProcessingResult> ProcessSingleImageAsync(ImageFile imageFile, ProcessingMetrics metrics, DetailedProgressReporter? progressReporter, CancellationToken cancellationToken)
+    private async Task<ProcessingResult> ProcessSingleImageAsync(ImageFile imageFile, ProcessingMetrics metrics, DetailedProgressReporter? progressReporter, CancellationToken cancellationToken, string? jobId = null)
     {
         try
         {
@@ -299,7 +299,7 @@ public class ImageProcessingService
         }
     }
 
-    private async Task<ProcessingResult> ProcessMultipageTiffAsync(ImageFile imageFile, ProcessingMetrics metrics, DetailedProgressReporter? progressReporter, CancellationToken cancellationToken)
+    private async Task<ProcessingResult> ProcessMultipageTiffAsync(ImageFile imageFile, ProcessingMetrics metrics, DetailedProgressReporter? progressReporter, CancellationToken cancellationToken, string? jobId = null)
     {
         try
         {
@@ -339,15 +339,18 @@ public class ImageProcessingService
                         $"Converting page {frame + 1} of {frameCount}...", 1, 1, frame + 1, frameCount);
                 
                 var magickImage = magickImageCollection[frame];
-                var pagePath = Path.Combine(_outputDirectory, 
-                    $"{Path.GetFileNameWithoutExtension(imageFile.FileName)}_page_{frame + 1}.png");
+                var fileNameBase = Path.GetFileNameWithoutExtension(imageFile.FileName);
+                var pageFileName = !string.IsNullOrEmpty(jobId) 
+                    ? $"{fileNameBase}_{jobId}_page_{frame + 1}.png"
+                    : $"{fileNameBase}_page_{frame + 1}.png";
+                var pagePath = Path.Combine(_outputDirectory, pageFileName);
                 
                 // Convert to PNG using ImageMagick
                 magickImage.Format = MagickFormat.Png;
                 await magickImage.WriteAsync(pagePath, cancellationToken);
                 
                 // Save to storage provider if configured
-                var relativePath = $"{Path.GetFileNameWithoutExtension(imageFile.FileName)}_page_{frame + 1}.png";
+                var relativePath = pageFileName;
                 var storedPath = await SaveFileAsync(pagePath, relativePath);
                 
                 imageFile.SplitPagePaths.Add(storedPath);
@@ -397,7 +400,7 @@ public class ImageProcessingService
         }
     }
 
-    private async Task<ProcessingResult> ProcessPdfAsync(ImageFile imageFile, ProcessingMetrics metrics, DetailedProgressReporter? progressReporter, CancellationToken cancellationToken)
+    private async Task<ProcessingResult> ProcessPdfAsync(ImageFile imageFile, ProcessingMetrics metrics, DetailedProgressReporter? progressReporter, CancellationToken cancellationToken, string? jobId = null)
     {
         try
         {
@@ -444,8 +447,11 @@ public class ImageProcessingService
                         $"Converting page {pageNum + 1} of {pageCount}...", 1, 1, pageNum + 1, pageCount);
                 
                 var magickImage = magickImageCollection[pageNum];
-                var pagePath = Path.Combine(_outputDirectory,
-                    $"{Path.GetFileNameWithoutExtension(imageFile.FileName)}_page_{pageNum + 1}.png");
+                var fileNameBase = Path.GetFileNameWithoutExtension(imageFile.FileName);
+                var pageFileName = !string.IsNullOrEmpty(jobId) 
+                    ? $"{fileNameBase}_{jobId}_page_{pageNum + 1}.png"
+                    : $"{fileNameBase}_page_{pageNum + 1}.png";
+                var pagePath = Path.Combine(_outputDirectory, pageFileName);
 
                 // Convert PDF page to PNG with high quality
                 magickImage.Format = MagickFormat.Png;
@@ -462,7 +468,7 @@ public class ImageProcessingService
                 long fileSize = await GetFileSizeWithRetryAsync(pagePath, cancellationToken);
                 
                 // Save to storage provider if configured
-                var relativePath = $"{Path.GetFileNameWithoutExtension(imageFile.FileName)}_page_{pageNum + 1}.png";
+                var relativePath = pageFileName;
                 var storedPath = await SaveFileAsync(pagePath, relativePath);
                 
                 imageFile.SplitPagePaths.Add(storedPath);
