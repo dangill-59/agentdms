@@ -259,21 +259,33 @@ public class ImageProcessingService
             
             // Image decode timing
             var decodeStart = DateTime.UtcNow;
-            using var image = await SixLabors.ImageSharp.Image.LoadAsync(imageFile.OriginalFilePath, cancellationToken);
-            metrics.ImageDecodeTime = DateTime.UtcNow - decodeStart;
+            var pngPath = Path.Combine(_outputDirectory, $"{Path.GetFileNameWithoutExtension(imageFile.FileName)}.png");
             
-            imageFile.Width = image.Width;
-            imageFile.Height = image.Height;
-            imageFile.IsMultiPage = false;
-            imageFile.PageCount = 1;
-
-            if (progressReporter != null)
-                await progressReporter.ReportProgress(imageFile.FileName, ProgressStatus.ConvertingPage, "Converting to PNG...", 1, 1, 1, 1);
-
             // Conversion timing
             var conversionStart = DateTime.UtcNow;
-            var pngPath = Path.Combine(_outputDirectory, $"{Path.GetFileNameWithoutExtension(imageFile.FileName)}.png");
-            await image.SaveAsPngAsync(pngPath, cancellationToken);
+            
+            // Load, process, and save the image in a controlled scope to ensure disposal
+            using (var image = await SixLabors.ImageSharp.Image.LoadAsync(imageFile.OriginalFilePath, cancellationToken))
+            {
+                metrics.ImageDecodeTime = DateTime.UtcNow - decodeStart;
+                
+                imageFile.Width = image.Width;
+                imageFile.Height = image.Height;
+                imageFile.IsMultiPage = false;
+                imageFile.PageCount = 1;
+
+                if (progressReporter != null)
+                    await progressReporter.ReportProgress(imageFile.FileName, ProgressStatus.ConvertingPage, "Converting to PNG...", 1, 1, 1, 1);
+
+                await image.SaveAsPngAsync(pngPath, cancellationToken);
+            } // Image is disposed here, releasing file handles
+            
+            // Force garbage collection and wait for finalizers to ensure cleanup
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            
+            // Add small delay to allow OS to release file handles
+            await Task.Delay(100, cancellationToken);
             
             // Save to storage provider if configured
             var relativePath = $"{Path.GetFileNameWithoutExtension(imageFile.FileName)}.png";
