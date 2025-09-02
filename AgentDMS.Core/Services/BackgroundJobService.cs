@@ -139,7 +139,7 @@ public class BackgroundJobService : BackgroundService, IBackgroundJobService
             });
 
             // Process the image
-            var result = await _imageProcessingService.ProcessImageAsync(job.FilePath, progressReporter, cancellationToken, job.UseMistralAI, job.UseMistralOcr, job.EnableOcr);
+            var result = await _imageProcessingService.ProcessImageAsync(job.FilePath, progressReporter, cancellationToken, job.UseMistralAI, job.UseMistralOcr, job.EnableOcr, job.JobId);
 
             job.Result = result;
             job.Status = result.Success ? JobStatus.Completed : JobStatus.Failed;
