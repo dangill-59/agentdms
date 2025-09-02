@@ -3,6 +3,7 @@ using AgentDMS.Core.Services.Storage;
 using AgentDMS.Core.Models;
 using AgentDMS.Web.Hubs;
 using AgentDMS.Web.Services;
+using AgentDMS.Web.Middleware;
 using Microsoft.OpenApi.Models;
 using System.Reflection;
 
@@ -293,19 +294,9 @@ else
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 
-// Configure static file serving for local storage only
-var storageService = app.Services.GetRequiredService<IStorageService>();
-if (storageService.StorageProvider is LocalStorageProvider localProvider)
-{
-    // For local storage, serve files directly from the storage directory
-    var outputDirectory = localProvider.BaseDirectory;
-    Directory.CreateDirectory(outputDirectory);
-    app.UseStaticFiles(new StaticFileOptions
-    {
-        FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(outputDirectory),
-        RequestPath = "/AgentDMS_Output"
-    });
-}
+// Use dynamic static file middleware for AgentDMS output files
+// This replaces the static configuration and allows runtime updates
+app.UseMiddleware<DynamicStaticFileMiddleware>();
 
 // Configure static file serving for AgentDMS_Scans directory (this remains local for now)
 var scansDirectory = Path.Combine(Path.GetTempPath(), "AgentDMS_Scans");
