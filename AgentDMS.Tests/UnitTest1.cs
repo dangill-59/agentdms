@@ -586,4 +586,112 @@ public class ImageProcessingServiceTests
         Assert.Contains("messages", json);
         Assert.Contains("temperature", json);
     }
+
+    [Fact]
+    public async Task ProcessPdfAsync_WithFileHandleStress_ShouldHandleResourcesCorrectly()
+    {
+        // This test verifies that the file locking improvements work correctly
+        // by processing multiple PDFs in quick succession to stress file handles
+        
+        // Arrange - Create multiple small PDF files for testing
+        var testPdfPaths = new List<string>();
+        try
+        {
+            for (int i = 0; i < 3; i++)
+            {
+                var pdfPath = CreateTestPdf($"stress_test_{i}.pdf");
+                testPdfPaths.Add(pdfPath);
+            }
+
+            // Act - Process all PDFs in quick succession to stress file handle management
+            var processingTasks = testPdfPaths.Select(async pdfPath =>
+            {
+                return await _imageProcessor.ProcessImageAsync(pdfPath);
+            });
+
+            var results = await Task.WhenAll(processingTasks);
+
+            // Assert - All processing should succeed despite potential file locking issues
+            Assert.All(results, result => 
+            {
+                // Allow for expected failures in test environment (missing Ghostscript)
+                // But ensure we don't get file locking specific errors
+                if (!result.Success)
+                {
+                    Assert.DoesNotContain("being used by another process", result.Message, StringComparison.OrdinalIgnoreCase);
+                    Assert.DoesNotContain("cannot access the file", result.Message, StringComparison.OrdinalIgnoreCase);
+                    Assert.DoesNotContain("sharing violation", result.Message, StringComparison.OrdinalIgnoreCase);
+                }
+            });
+
+            // At least verify that we didn't encounter file locking issues
+            var fileLockErrors = results.Where(r => !r.Success && 
+                (r.Message.Contains("being used by another process", StringComparison.OrdinalIgnoreCase) ||
+                 r.Message.Contains("cannot access the file", StringComparison.OrdinalIgnoreCase) ||
+                 r.Message.Contains("sharing violation", StringComparison.OrdinalIgnoreCase)))
+                .ToList();
+
+            Assert.Empty(fileLockErrors);
+        }
+        finally
+        {
+            // Cleanup
+            foreach (var pdfPath in testPdfPaths)
+            {
+                if (File.Exists(pdfPath))
+                {
+                    try
+                    {
+                        File.Delete(pdfPath);
+                    }
+                    catch (IOException)
+                    {
+                        // Ignore cleanup errors - they don't affect the test validity
+                    }
+                }
+            }
+        }
+    }
+
+    [Fact]
+    public async Task WriteFileWithRetryAsync_WithInvalidPath_ShouldEventuallyFail()
+    {
+        // This test verifies that the retry mechanism doesn't loop forever
+        // and eventually throws appropriate exceptions for truly invalid operations
+        
+        // Use reflection to access the private WriteFileWithRetryAsync method for testing
+        var imageProcessor = new ImageProcessingService(outputDirectory: _testOutputDir);
+        var method = typeof(ImageProcessingService).GetMethod("WriteFileWithRetryAsync", 
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        
+        Assert.NotNull(method);
+
+        // Create a test MagickImage
+        using var testImage = new ImageMagick.MagickImage(ImageMagick.MagickColors.Red, 50, 50);
+        
+        // Try to write to an invalid path (no permission or invalid directory)
+        var invalidPath = "/invalid/directory/that/does/not/exist/test.png";
+        
+        // Act & Assert - Should eventually throw an exception after retries
+        var exception = await Assert.ThrowsAnyAsync<Exception>(async () =>
+        {
+            try
+            {
+                await (Task)method.Invoke(imageProcessor, new object[] { testImage, invalidPath, CancellationToken.None });
+            }
+            catch (System.Reflection.TargetInvocationException ex)
+            {
+                // Re-throw the inner exception for cleaner assertion
+                throw ex.InnerException ?? ex;
+            }
+        });
+
+        // The exception should be a directory/path related exception, not a file lock exception
+        Assert.True(exception is DirectoryNotFoundException || 
+                   exception is UnauthorizedAccessException ||
+                   exception is IOException);
+        
+        // Verify it's not a file lock issue
+        Assert.DoesNotContain("being used by another process", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
 }

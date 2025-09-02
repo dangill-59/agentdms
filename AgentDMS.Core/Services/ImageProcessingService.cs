@@ -345,9 +345,14 @@ public class ImageProcessingService
                     : $"{fileNameBase}_page_{frame + 1}.png";
                 var pagePath = Path.Combine(_outputDirectory, pageFileName);
                 
+                _logger?.LogDebug("Converting TIFF frame {FrameNum} of {FrameCount} to PNG: {PagePath}", 
+                    frame + 1, frameCount, pagePath);
+                
                 // Convert to PNG using ImageMagick
                 magickImage.Format = MagickFormat.Png;
-                await magickImage.WriteAsync(pagePath, cancellationToken);
+                
+                // Use retry mechanism for file write operations to handle file locking
+                await WriteFileWithRetryAsync(magickImage, pagePath, cancellationToken);
                 
                 // Save to storage provider if configured
                 var relativePath = pageFileName;
@@ -453,16 +458,16 @@ public class ImageProcessingService
                     : $"{fileNameBase}_page_{pageNum + 1}.png";
                 var pagePath = Path.Combine(_outputDirectory, pageFileName);
 
+                _logger?.LogDebug("Converting PDF page {PageNum} of {PageCount} to PNG: {PagePath}", 
+                    pageNum + 1, pageCount, pagePath);
+
                 // Convert PDF page to PNG with high quality
                 magickImage.Format = MagickFormat.Png;
                 magickImage.ColorType = ColorType.TrueColor;
                 magickImage.BackgroundColor = MagickColors.White;
                 
-                await magickImage.WriteAsync(pagePath, cancellationToken);
-                
-                // Ensure file is completely written and handle is released
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
+                // Use retry mechanism for file write operations to handle file locking
+                await WriteFileWithRetryAsync(magickImage, pagePath, cancellationToken);
                 
                 // Get file size with retry mechanism to handle potential file lock conflicts
                 long fileSize = await GetFileSizeWithRetryAsync(pagePath, cancellationToken);
@@ -947,6 +952,80 @@ public class ImageProcessingService
     }
 
     /// <summary>
+    /// Write MagickImage to file with retry mechanism to handle file locking issues
+    /// </summary>
+    /// <param name="magickImage">The IMagickImage to write</param>
+    /// <param name="filePath">Path where to write the file</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Task representing the async operation</returns>
+    private async Task WriteFileWithRetryAsync(IMagickImage magickImage, string filePath, CancellationToken cancellationToken)
+    {
+        const int maxRetries = 3;
+        const int baseDelayMs = 200;
+        
+        _logger?.LogDebug("Starting file write with retry for: {FilePath}", filePath);
+        
+        for (int attempt = 0; attempt < maxRetries; attempt++)
+        {
+            try
+            {
+                // Add delay before retry attempts to allow file handles to be released
+                if (attempt > 0)
+                {
+                    var delayMs = baseDelayMs * (int)Math.Pow(2, attempt - 1); // Exponential backoff
+                    _logger?.LogDebug("File write retry attempt {Attempt} for {FilePath}, waiting {DelayMs}ms", 
+                        attempt + 1, filePath, delayMs);
+                    await Task.Delay(delayMs, cancellationToken);
+                }
+                
+                // Attempt to write the file
+                await magickImage.WriteAsync(filePath, cancellationToken);
+                
+                // Force immediate disposal of any file handles
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                
+                // Add small delay to ensure OS releases file handles
+                await Task.Delay(50, cancellationToken);
+                
+                _logger?.LogDebug("Successfully wrote file on attempt {Attempt}: {FilePath}", 
+                    attempt + 1, filePath);
+                return; // Success - exit the retry loop
+            }
+            catch (IOException ex) when (attempt < maxRetries - 1 && IsFileLockException(ex))
+            {
+                _logger?.LogWarning("File lock detected on attempt {Attempt} for {FilePath}: {Error}. Retrying...", 
+                    attempt + 1, filePath, ex.Message);
+                // Continue to next retry attempt
+            }
+            catch (UnauthorizedAccessException ex) when (attempt < maxRetries - 1)
+            {
+                _logger?.LogWarning("Access denied on attempt {Attempt} for {FilePath}: {Error}. Retrying...", 
+                    attempt + 1, filePath, ex.Message);
+                // Continue to next retry attempt
+            }
+        }
+        
+        // Final attempt without catching exceptions - let it throw if it fails
+        _logger?.LogWarning("Final attempt to write file after {MaxRetries} retries: {FilePath}", maxRetries, filePath);
+        await magickImage.WriteAsync(filePath, cancellationToken);
+    }
+
+    /// <summary>
+    /// Determines if an IOException is likely due to file locking
+    /// </summary>
+    /// <param name="ex">The IOException to check</param>
+    /// <returns>True if the exception appears to be file lock related</returns>
+    private static bool IsFileLockException(IOException ex)
+    {
+        var message = ex.Message.ToLowerInvariant();
+        return message.Contains("being used by another process") ||
+               message.Contains("cannot access the file") ||
+               message.Contains("sharing violation") ||
+               message.Contains("lock");
+    }
+
+    /// <summary>
     /// Get file size with retry mechanism to handle file locking issues
     /// </summary>
     /// <param name="filePath">Path to the file</param>
@@ -955,7 +1034,9 @@ public class ImageProcessingService
     private async Task<long> GetFileSizeWithRetryAsync(string filePath, CancellationToken cancellationToken)
     {
         const int maxRetries = 5;
-        const int delayMs = 100;
+        const int baseDelayMs = 100;
+        
+        _logger?.LogDebug("Getting file size with retry for: {FilePath}", filePath);
         
         for (int attempt = 0; attempt < maxRetries; attempt++)
         {
@@ -964,34 +1045,41 @@ public class ImageProcessingService
                 // Wait a bit before each attempt to allow file handles to be released
                 if (attempt > 0)
                 {
-                    await Task.Delay(delayMs * attempt, cancellationToken);
+                    var delayMs = baseDelayMs * attempt; // Linear backoff for file size checks
+                    _logger?.LogDebug("File size retry attempt {Attempt} for {FilePath}, waiting {DelayMs}ms", 
+                        attempt + 1, filePath, delayMs);
+                    await Task.Delay(delayMs, cancellationToken);
                 }
                 
                 var fileInfo = new FileInfo(filePath);
                 if (fileInfo.Exists)
                 {
-                    return fileInfo.Length;
+                    var size = fileInfo.Length;
+                    _logger?.LogDebug("Successfully got file size on attempt {Attempt}: {FilePath} = {FileSize} bytes", 
+                        attempt + 1, filePath, size);
+                    return size;
                 }
                 else
                 {
                     throw new FileNotFoundException($"File not found: {filePath}");
                 }
             }
-            catch (IOException ex) when (attempt < maxRetries - 1)
+            catch (IOException ex) when (attempt < maxRetries - 1 && IsFileLockException(ex))
             {
-                _logger?.LogWarning("Attempt {Attempt} failed to access file {FilePath}: {Error}", 
+                _logger?.LogWarning("File lock detected during size check on attempt {Attempt} for {FilePath}: {Error}", 
                     attempt + 1, filePath, ex.Message);
                 // Continue to next retry attempt
             }
             catch (UnauthorizedAccessException ex) when (attempt < maxRetries - 1)
             {
-                _logger?.LogWarning("Attempt {Attempt} failed to access file {FilePath}: {Error}", 
+                _logger?.LogWarning("Access denied during size check on attempt {Attempt} for {FilePath}: {Error}", 
                     attempt + 1, filePath, ex.Message);
                 // Continue to next retry attempt
             }
         }
         
         // Final attempt without catching exceptions
+        _logger?.LogWarning("Final attempt to get file size after {MaxRetries} retries: {FilePath}", maxRetries, filePath);
         return new FileInfo(filePath).Length;
     }
 
