@@ -1,8 +1,10 @@
 using Xunit;
+using System;
 using System.IO;
 using System.Threading.Tasks;
 using System.Text.Json;
 using AgentDMS.Core.Services;
+using AgentDMS.Core.Services.Storage;
 using AgentDMS.Core.Models;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Png;
@@ -693,5 +695,75 @@ public class ImageProcessingServiceTests
         
         // Verify it's not a file lock issue
         Assert.DoesNotContain("being used by another process", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ProcessImageAsync_WithCloudStorage_ShouldCleanupTemporaryFiles()
+    {
+        // This test verifies that temporary files are properly cleaned up when using cloud storage
+        // Arrange
+        var tempStorageDir = Path.Combine(Path.GetTempPath(), "TestStorage_" + Guid.NewGuid().ToString());
+        var tempProcessingDir = Path.Combine(Path.GetTempPath(), "AgentDMS_Processing");
+        Directory.CreateDirectory(tempStorageDir);
+        Directory.CreateDirectory(tempProcessingDir);
+
+        var localStorageProvider = new LocalStorageProvider(tempStorageDir);
+        
+        // Create a mock storage service that uses the local provider but simulates cloud storage behavior
+        var mockStorageService = new MockStorageService(localStorageProvider);
+        var imageProcessor = new ImageProcessingService(mockStorageService, logger: null);
+        
+        // Create a simple test image
+        var testImagePath = CreateTestImage("test.png");
+
+        try
+        {
+            // Get initial file count in processing directory
+            var initialTempFiles = Directory.Exists(tempProcessingDir) ? 
+                Directory.GetFiles(tempProcessingDir, "*").Length : 0;
+
+            // Act - Process the image
+            var result = await imageProcessor.ProcessImageAsync(testImagePath);
+
+            // Assert - Processing should succeed
+            Assert.True(result.Success, $"Processing failed: {result.Message}");
+            
+            // Wait a bit to ensure cleanup completes
+            await Task.Delay(500);
+
+            // Verify no new temporary files remain in the processing directory
+            var finalTempFiles = Directory.Exists(tempProcessingDir) ? 
+                Directory.GetFiles(tempProcessingDir, "*").Length : 0;
+            
+            // Should not have more temp files than we started with
+            Assert.True(finalTempFiles <= initialTempFiles, 
+                $"Temporary files not cleaned up. Started with {initialTempFiles}, ended with {finalTempFiles}");
+
+            // Verify files were actually saved to storage
+            Assert.NotNull(result.ProcessedImage);
+            Assert.True(result.ProcessedImage.ConvertedPngPath.StartsWith(tempStorageDir), 
+                "File should be stored in the storage directory, not temp directory");
+        }
+        finally
+        {
+            // Cleanup
+            if (File.Exists(testImagePath))
+                File.Delete(testImagePath);
+            if (Directory.Exists(tempStorageDir))
+                Directory.Delete(tempStorageDir, true);
+        }
+    }
+
+    // Mock storage service for testing
+    private class MockStorageService : IStorageService
+    {
+        public IStorageProvider StorageProvider { get; }
+        public StorageConfig Configuration { get; }
+
+        public MockStorageService(IStorageProvider provider)
+        {
+            StorageProvider = provider;
+            Configuration = new StorageConfig { Provider = "Local" };
+        }
     }
 }

@@ -279,6 +279,9 @@ public class ImageProcessingService
             var relativePath = $"{Path.GetFileNameWithoutExtension(imageFile.FileName)}.png";
             var storedPath = await SaveFileAsync(pngPath, relativePath);
             
+            // Clean up temporary file after successful storage upload (for cloud storage)
+            await CleanupTemporaryFileAsync(pngPath, storedPath);
+            
             imageFile.ConvertedPngPath = storedPath;
             metrics.ConversionTime = DateTime.UtcNow - conversionStart;
 
@@ -357,6 +360,9 @@ public class ImageProcessingService
                 // Save to storage provider if configured
                 var relativePath = pageFileName;
                 var storedPath = await SaveFileAsync(pagePath, relativePath);
+                
+                // Clean up temporary file after successful storage upload (for cloud storage)
+                await CleanupTemporaryFileAsync(pagePath, storedPath);
                 
                 imageFile.SplitPagePaths.Add(storedPath);
 
@@ -475,6 +481,9 @@ public class ImageProcessingService
                 // Save to storage provider if configured
                 var relativePath = pageFileName;
                 var storedPath = await SaveFileAsync(pagePath, relativePath);
+                
+                // Clean up temporary file after successful storage upload (for cloud storage)
+                await CleanupTemporaryFileAsync(pagePath, storedPath);
                 
                 imageFile.SplitPagePaths.Add(storedPath);
 
@@ -1099,6 +1108,88 @@ public class ImageProcessingService
         
         // Legacy mode: file is already in the correct location
         return filePath;
+    }
+
+    /// <summary>
+    /// Clean up temporary file after successful storage upload
+    /// Only deletes temp files when using cloud storage (not local storage)
+    /// </summary>
+    /// <param name="tempFilePath">Path to the temporary file</param>
+    /// <param name="storedPath">Path where file was stored (to determine if cleanup is needed)</param>
+    private async Task CleanupTemporaryFileAsync(string tempFilePath, string storedPath)
+    {
+        // Only clean up temp files if we're using cloud storage (paths are different)
+        // For local storage, tempFilePath and storedPath are the same, so don't delete
+        if (_storageService?.StorageProvider != null && tempFilePath != storedPath)
+        {
+            try
+            {
+                await DeleteFileWithRetryAsync(tempFilePath);
+                _logger?.LogDebug("Cleaned up temporary file after storage upload: {TempFilePath}", tempFilePath);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Failed to clean up temporary file {TempFilePath} after storage upload", tempFilePath);
+                // Don't throw - cleanup failure shouldn't break the main processing flow
+            }
+        }
+    }
+
+    /// <summary>
+    /// Delete a file with retry mechanism to handle file locking issues
+    /// </summary>
+    /// <param name="filePath">Path to the file to delete</param>
+    private async Task DeleteFileWithRetryAsync(string filePath)
+    {
+        if (!File.Exists(filePath))
+            return;
+
+        const int maxRetries = 5;
+        const int baseDelayMs = 100;
+        
+        for (int attempt = 0; attempt < maxRetries; attempt++)
+        {
+            try
+            {
+                if (attempt > 0)
+                {
+                    // Use longer delays for file deletion to allow handles to be fully released
+                    var delayMs = baseDelayMs * (int)Math.Pow(2, attempt - 1); // Exponential backoff
+                    _logger?.LogDebug("File deletion retry attempt {Attempt} for {FilePath}, waiting {DelayMs}ms", 
+                        attempt + 1, filePath, delayMs);
+                    await Task.Delay(delayMs);
+                }
+                
+                File.Delete(filePath);
+                _logger?.LogDebug("Successfully deleted file on attempt {Attempt}: {FilePath}", 
+                    attempt + 1, filePath);
+                return;
+            }
+            catch (IOException ex) when (attempt < maxRetries - 1 && IsFileLockException(ex))
+            {
+                _logger?.LogWarning("File lock detected during deletion on attempt {Attempt} for {FilePath}: {Error}. Retrying...", 
+                    attempt + 1, filePath, ex.Message);
+                // Continue to next retry attempt
+            }
+            catch (UnauthorizedAccessException ex) when (attempt < maxRetries - 1)
+            {
+                _logger?.LogWarning("Access denied during deletion on attempt {Attempt} for {FilePath}: {Error}. Retrying...", 
+                    attempt + 1, filePath, ex.Message);
+                // Continue to next retry attempt
+            }
+        }
+        
+        // Final attempt without catching exceptions - let it throw if it fails
+        _logger?.LogWarning("Final attempt to delete file after {MaxRetries} retries: {FilePath}", maxRetries, filePath);
+        try
+        {
+            File.Delete(filePath);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to delete temporary file after {MaxRetries} attempts: {FilePath}", maxRetries, filePath);
+            // Don't throw - this is cleanup, shouldn't break main flow
+        }
     }
 
     /// <summary>
