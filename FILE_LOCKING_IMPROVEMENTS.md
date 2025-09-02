@@ -16,6 +16,8 @@ These issues were caused by:
 2. Lack of retry mechanisms for write operations
 3. Insufficient delays between operations
 4. Poor visibility into file locking scenarios
+5. **NEW**: Race conditions when using cloud storage where temporary files weren't properly cleaned up
+6. **NEW**: LocalStorageProvider attempting to copy files to themselves in certain configurations
 
 ## Solution Implementation
 
@@ -85,6 +87,70 @@ await WriteFileWithRetryAsync(magickImage, pagePath, cancellationToken);
 ### 5. ProcessMultipageTiffAsync Updates
 
 Applied the same improvements to TIFF processing for consistency.
+
+### 6. **NEW**: Temporary File Cleanup Improvements
+
+Added comprehensive cleanup of temporary files when using cloud storage:
+
+```csharp
+private async Task CleanupTemporaryFileAsync(string tempFilePath, string storedPath)
+private async Task DeleteFileWithRetryAsync(string filePath)
+```
+
+**Features:**
+- Only cleans up temp files when using cloud storage (paths differ from storage paths)
+- Exponential backoff retry for file deletion operations
+- Enhanced error handling that doesn't break main processing flow
+
+### 7. **NEW**: LocalStorageProvider Same-File Copy Detection
+
+Enhanced LocalStorageProvider to handle edge cases:
+
+```csharp
+// Check if source and destination are the same file (normalized paths)
+var normalizedSource = Path.GetFullPath(sourcePath);
+var normalizedDestination = Path.GetFullPath(fullDestinationPath);
+
+if (string.Equals(normalizedSource, normalizedDestination, StringComparison.OrdinalIgnoreCase))
+{
+    // Source and destination are the same - no copy needed
+    return GetFileUrl(destinationPath);
+}
+```
+
+**Improvements:**
+- Detects when source and destination paths resolve to the same file
+- Skips unnecessary copy operations that would cause file locks
+- Added retry mechanism to LocalStorageProvider copy operations
+
+### 8. **NEW**: Enhanced Image Disposal Management
+
+Improved SixLabors.ImageSharp disposal to ensure file handles are released:
+
+```csharp
+using (var image = await SixLabors.ImageSharp.Image.LoadAsync(imageFile.OriginalFilePath, cancellationToken))
+{
+    // Process image
+    await image.SaveAsPngAsync(pngPath, cancellationToken);
+} // Image disposed here
+
+// Force garbage collection and wait for finalizers
+GC.Collect();
+GC.WaitForPendingFinalizers();
+await Task.Delay(100, cancellationToken);
+```
+
+### 9. **NEW**: BackgroundJobService Directory Cleanup
+
+Enhanced cleanup to handle both legacy and current temp directories:
+
+```csharp
+var possibleTempDirs = new[]
+{
+    Path.Combine(tempPath, "AgentDMS_Output"),      // Legacy directory name
+    Path.Combine(tempPath, "AgentDMS_Processing")   // Current directory name for cloud storage
+};
+```
 
 ## Logging Enhancements
 
