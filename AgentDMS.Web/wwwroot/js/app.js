@@ -2808,3 +2808,366 @@ function showStorageStatus(message, type) {
         }, 5000);
     }
 }
+
+// Document Search Functionality
+let currentSearchQuery = '';
+let currentPage = 1;
+const documentsPerPage = 10;
+
+// Load document statistics when the documents tab is shown
+document.addEventListener('DOMContentLoaded', function() {
+    // Load stats when documents tab becomes active
+    const documentsTab = document.getElementById('documents-tab');
+    if (documentsTab) {
+        documentsTab.addEventListener('shown.bs.tab', function () {
+            loadDocumentStats();
+        });
+    }
+});
+
+async function loadDocumentStats() {
+    try {
+        const response = await fetch('/api/Document/stats');
+        if (response.ok) {
+            const stats = await response.json();
+            
+            document.getElementById('totalDocuments').textContent = stats.totalDocuments;
+            
+            // Count documents with OCR text
+            const withOcrCount = stats.recentDocuments.filter(d => d.extractedText && d.extractedText.trim() !== '').length;
+            document.getElementById('documentsWithOcr').textContent = withOcrCount;
+            
+            // Count recent documents (last 24 hours)
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            const recentCount = stats.recentDocuments.filter(d => new Date(d.createdAt) > yesterday).length;
+            document.getElementById('recentDocumentsCount').textContent = recentCount;
+        }
+    } catch (error) {
+        console.error('Error loading document stats:', error);
+    }
+}
+
+async function searchDocuments() {
+    const searchInput = document.getElementById('documentSearchInput');
+    const query = searchInput.value.trim();
+    
+    if (!query) {
+        showError('Please enter a search term');
+        return;
+    }
+    
+    currentSearchQuery = query;
+    currentPage = 1;
+    
+    await performDocumentSearch();
+}
+
+async function loadRecentDocuments() {
+    try {
+        const response = await fetch('/api/Document/recent?count=20');
+        if (response.ok) {
+            const documents = await response.json();
+            displayDocuments(documents, 'Recent Documents');
+            
+            // Hide pagination for recent documents
+            document.getElementById('documentPagination').classList.add('d-none');
+        } else {
+            showError('Failed to load recent documents');
+        }
+    } catch (error) {
+        console.error('Error loading recent documents:', error);
+        showError('Error loading recent documents');
+    }
+}
+
+async function performDocumentSearch() {
+    const resultsContainer = document.getElementById('documentSearchResults');
+    
+    // Show loading state
+    resultsContainer.innerHTML = `
+        <div class="text-center py-4">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Searching...</span>
+            </div>
+            <p class="mt-2">Searching documents...</p>
+        </div>
+    `;
+    
+    try {
+        const skip = (currentPage - 1) * documentsPerPage;
+        const response = await fetch(`/api/Document/search?q=${encodeURIComponent(currentSearchQuery)}&skip=${skip}&take=${documentsPerPage}`);
+        
+        if (response.ok) {
+            const result = await response.json();
+            displayDocuments(result.documents, `Search Results for "${currentSearchQuery}"`);
+            
+            // Show pagination if there are more results
+            if (result.documents.length === documentsPerPage) {
+                showPagination();
+            } else {
+                document.getElementById('documentPagination').classList.add('d-none');
+            }
+        } else {
+            showError('Search failed. Please try again.');
+        }
+    } catch (error) {
+        console.error('Error searching documents:', error);
+        showError('Error searching documents');
+    }
+}
+
+function displayDocuments(documents, title) {
+    const resultsContainer = document.getElementById('documentSearchResults');
+    
+    if (!documents || documents.length === 0) {
+        resultsContainer.innerHTML = `
+            <div class="text-center text-muted py-4">
+                <i class="bi bi-file-earmark-x" style="font-size: 3rem;"></i>
+                <h5 class="mt-2">${title}</h5>
+                <p>No documents found matching your search criteria.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    let html = `<h6 class="mb-3">${title} (${documents.length} found)</h6>`;
+    
+    documents.forEach(doc => {
+        const createdDate = new Date(doc.createdAt).toLocaleDateString();
+        const fileSize = formatFileSize(doc.fileSizeBytes);
+        const hasOcr = doc.extractedText && doc.extractedText.trim() !== '';
+        const ocrPreview = hasOcr ? 
+            doc.extractedText.substring(0, 150) + (doc.extractedText.length > 150 ? '...' : '') : 
+            'No text extracted';
+        
+        html += `
+            <div class="card mb-3">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <h6 class="card-title">
+                                <i class="bi bi-file-earmark-text"></i> ${escapeHtml(doc.fileName)}
+                                ${hasOcr ? '<span class="badge bg-success ms-2">OCR</span>' : ''}
+                                ${doc.status === 'Completed' ? '<span class="badge bg-primary ms-1">Processed</span>' : ''}
+                            </h6>
+                            <p class="card-text">
+                                <small class="text-muted">
+                                    Uploaded: ${createdDate} | Size: ${fileSize} | Pages: ${doc.pageCount}
+                                    ${doc.ocrMethod ? ` | OCR: ${doc.ocrMethod}` : ''}
+                                </small>
+                            </p>
+                            ${hasOcr ? `
+                                <div class="mt-2">
+                                    <button class="btn btn-sm btn-outline-primary" 
+                                            onclick="toggleDocumentText(${doc.id})" 
+                                            id="toggle-text-${doc.id}">
+                                        <i class="bi bi-eye"></i> Show Text
+                                    </button>
+                                </div>
+                                <div class="collapse mt-2" id="text-content-${doc.id}">
+                                    <div class="card border-light">
+                                        <div class="card-body">
+                                            <small class="text-muted">Extracted Text Preview:</small>
+                                            <pre class="mt-1" style="white-space: pre-wrap; font-size: 0.85em; max-height: 200px; overflow-y: auto;">${escapeHtml(ocrPreview)}</pre>
+                                        </div>
+                                    </div>
+                                </div>
+                            ` : `
+                                <div class="text-muted mt-2">
+                                    <small><i class="bi bi-info-circle"></i> ${ocrPreview}</small>
+                                </div>
+                            `}
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <div class="btn-group-vertical" role="group">
+                                <button class="btn btn-sm btn-outline-primary" onclick="viewDocument(${doc.id})">
+                                    <i class="bi bi-eye"></i> View
+                                </button>
+                                <button class="btn btn-sm btn-outline-info" onclick="downloadDocument(${doc.id})">
+                                    <i class="bi bi-download"></i> Download
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" onclick="deleteDocument(${doc.id})">
+                                    <i class="bi bi-trash"></i> Delete
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    resultsContainer.innerHTML = html;
+}
+
+function toggleDocumentText(documentId) {
+    const textContent = document.getElementById(`text-content-${documentId}`);
+    const toggleBtn = document.getElementById(`toggle-text-${documentId}`);
+    
+    if (textContent.classList.contains('show')) {
+        textContent.classList.remove('show');
+        toggleBtn.innerHTML = '<i class="bi bi-eye"></i> Show Text';
+    } else {
+        textContent.classList.add('show');
+        toggleBtn.innerHTML = '<i class="bi bi-eye-slash"></i> Hide Text';
+    }
+}
+
+function showPagination() {
+    const pagination = document.getElementById('documentPagination');
+    const currentPageInfo = document.getElementById('currentPageInfo');
+    
+    currentPageInfo.textContent = `Page ${currentPage}`;
+    pagination.classList.remove('d-none');
+}
+
+async function changePage(direction) {
+    if (direction === 'prev' && currentPage > 1) {
+        currentPage--;
+    } else if (direction === 'next') {
+        currentPage++;
+    }
+    
+    if (currentSearchQuery) {
+        await performDocumentSearch();
+    }
+}
+
+async function viewDocument(documentId) {
+    try {
+        const response = await fetch(`/api/Document/${documentId}`);
+        if (response.ok) {
+            const doc = await response.json();
+            
+            // Create modal to show document details
+            const modalHtml = `
+                <div class="modal fade" id="documentModal" tabindex="-1">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">${escapeHtml(doc.fileName)}</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h6>File Information</h6>
+                                        <ul class="list-unstyled">
+                                            <li><strong>Size:</strong> ${formatFileSize(doc.fileSizeBytes)}</li>
+                                            <li><strong>Type:</strong> ${doc.contentType}</li>
+                                            <li><strong>Pages:</strong> ${doc.pageCount}</li>
+                                            <li><strong>Uploaded:</strong> ${new Date(doc.createdAt).toLocaleString()}</li>
+                                            <li><strong>Status:</strong> ${doc.status}</li>
+                                        </ul>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h6>Processing Information</h6>
+                                        <ul class="list-unstyled">
+                                            <li><strong>OCR Method:</strong> ${doc.ocrMethod || 'None'}</li>
+                                            <li><strong>OCR Confidence:</strong> ${doc.ocrConfidence ? (doc.ocrConfidence * 100).toFixed(1) + '%' : 'N/A'}</li>
+                                            <li><strong>Processing Time:</strong> ${doc.ocrProcessingTime || 'N/A'}</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                                ${doc.extractedText ? `
+                                    <div class="mt-3">
+                                        <h6>Extracted Text</h6>
+                                        <div class="border rounded p-3" style="max-height: 300px; overflow-y: auto;">
+                                            <pre style="white-space: pre-wrap; font-size: 0.9em;">${escapeHtml(doc.extractedText)}</pre>
+                                        </div>
+                                    </div>
+                                ` : ''}
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                <button type="button" class="btn btn-primary" onclick="downloadDocument(${doc.id})">
+                                    <i class="bi bi-download"></i> Download
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Remove existing modal if any
+            const existingModal = document.getElementById('documentModal');
+            if (existingModal) {
+                existingModal.remove();
+            }
+            
+            // Add modal to page and show it
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            const modal = new bootstrap.Modal(document.getElementById('documentModal'));
+            modal.show();
+        } else {
+            showError('Failed to load document details');
+        }
+    } catch (error) {
+        console.error('Error viewing document:', error);
+        showError('Error loading document');
+    }
+}
+
+function downloadDocument(documentId) {
+    // For now, just show a message since we need to implement file serving
+    showError('Download functionality will be implemented based on your storage configuration');
+}
+
+async function deleteDocument(documentId) {
+    if (!confirm('Are you sure you want to delete this document? This action cannot be undone.')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/Document/${documentId}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            showSuccess('Document deleted successfully');
+            
+            // Refresh current view
+            if (currentSearchQuery) {
+                await performDocumentSearch();
+            } else {
+                await loadRecentDocuments();
+            }
+            
+            // Reload stats
+            await loadDocumentStats();
+        } else {
+            showError('Failed to delete document');
+        }
+    } catch (error) {
+        console.error('Error deleting document:', error);
+        showError('Error deleting document');
+    }
+}
+
+// Utility functions
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function showError(message) {
+    // You can customize this to use your existing error display mechanism
+    console.error(message);
+    alert('Error: ' + message);
+}
+
+function showSuccess(message) {
+    // You can customize this to use your existing success display mechanism
+    console.log(message);
+    alert('Success: ' + message);
+}

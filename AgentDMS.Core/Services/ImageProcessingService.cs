@@ -9,8 +9,10 @@ using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.Processing;
 using ImageMagick;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 using AgentDMS.Core.Models;
 using AgentDMS.Core.Services.Storage;
+using System.Text.Json;
 
 namespace AgentDMS.Core.Services;
 
@@ -22,6 +24,7 @@ public class ImageProcessingService
     private readonly SemaphoreSlim _semaphore;
     private readonly string _outputDirectory;
     private readonly IStorageService? _storageService;
+    private readonly IServiceProvider? _serviceProvider;
     private readonly ILogger<ImageProcessingService>? _logger;
     private readonly MistralDocumentAiService? _mistralService;
     private readonly MistralOcrService? _mistralOcrService;
@@ -36,10 +39,12 @@ public class ImageProcessingService
         ILogger<ImageProcessingService>? logger = null,
         MistralDocumentAiService? mistralService = null,
         MistralOcrService? mistralOcrService = null,
-        PerformanceCache? cache = null)
+        PerformanceCache? cache = null,
+        IServiceProvider? serviceProvider = null)
     {
         _semaphore = new SemaphoreSlim(maxConcurrency);
         _storageService = storageService ?? throw new ArgumentNullException(nameof(storageService));
+        _serviceProvider = serviceProvider;
         _outputDirectory = GetOutputDirectory();
         _logger = logger;
         _mistralService = mistralService;
@@ -64,6 +69,7 @@ public class ImageProcessingService
         _semaphore = new SemaphoreSlim(maxConcurrency);
         _outputDirectory = outputDirectory ?? Path.Combine(Path.GetTempPath(), "AgentDMS_Output");
         _storageService = null; // Legacy mode uses local storage directly
+        _serviceProvider = null; // Legacy mode doesn't save to database
         _logger = logger;
         _mistralService = mistralService;
         _mistralOcrService = mistralOcrService;
@@ -168,6 +174,9 @@ public class ImageProcessingService
                 
                 // Optimize OCR and AI processing based on configuration
                 await OptimizeTextExtractionAndAnalysisAsync(result, progressReporter, cancellationToken, useMistralOcr, useMistralAI, enableOcr, fileName);
+                
+                // Save document to database if document service is available
+                await SaveDocumentToDatabaseAsync(result, filePath, cancellationToken);
                 
                 if (progressReporter != null)
                     await progressReporter.ReportProgress(fileName, ProgressStatus.Completed, "Processing completed successfully");
@@ -1210,6 +1219,109 @@ public class ImageProcessingService
     public static string[] GetSupportedExtensions()
     {
         return new[] { ".jpg", ".jpeg", ".png", ".bmp", ".gif", ".tif", ".tiff", ".pdf", ".webp" };
+    }
+
+    /// <summary>
+    /// Save processed document to database if document service is available
+    /// </summary>
+    private async Task SaveDocumentToDatabaseAsync(ProcessingResult result, string originalFilePath, CancellationToken cancellationToken)
+    {
+        if (_serviceProvider == null || result.ProcessedImage == null)
+        {
+            return;
+        }
+
+        try
+        {
+            // Create a scope to get the scoped DocumentService
+            using var scope = _serviceProvider.CreateScope();
+            var documentService = scope.ServiceProvider.GetService<IDocumentService>();
+            
+            if (documentService == null)
+            {
+                _logger?.LogDebug("DocumentService not available, skipping database save");
+                return;
+            }
+
+            var document = new Document
+            {
+                FileName = result.ProcessedImage.FileName,
+                FilePath = result.ProcessedImage.OriginalFilePath,
+                ContentType = GetContentType(result.ProcessedImage.OriginalFormat),
+                FileSizeBytes = result.ProcessedImage.FileSize,
+                CreatedAt = result.ProcessedImage.CreatedDate,
+                UpdatedAt = DateTime.UtcNow,
+                ExtractedText = result.ExtractedText,
+                OcrMethod = result.Metrics?.OcrMethod,
+                OcrConfidence = result.Metrics?.OcrConfidence,
+                OcrProcessingTime = result.Metrics?.OcrProcessingTime,
+                PageCount = result.ProcessedImage.PageCount,
+                ThumbnailPath = result.ProcessedImage.ThumbnailPath,
+                Status = DocumentStatus.Completed
+            };
+
+            // Add metadata as JSON
+            if (result.ProcessedImage.Metadata.Any() || result.AiAnalysis != null)
+            {
+                var metadata = new Dictionary<string, object>();
+                
+                // Copy existing metadata
+                foreach (var kvp in result.ProcessedImage.Metadata)
+                {
+                    metadata[kvp.Key] = kvp.Value;
+                }
+
+                // Add AI analysis if available
+                if (result.AiAnalysis != null)
+                {
+                    metadata["AiAnalysis"] = result.AiAnalysis;
+                }
+
+                // Add processing metrics
+                if (result.Metrics != null)
+                {
+                    metadata["ProcessingMetrics"] = new
+                    {
+                        ProcessingTime = result.Metrics.ProcessingTime.TotalSeconds,
+                        FileLoadTime = result.Metrics.FileLoadTime?.TotalSeconds,
+                        ConversionTime = result.Metrics.ConversionTime?.TotalSeconds,
+                        ThumbnailGenerationTime = result.Metrics.ThumbnailGenerationTime?.TotalSeconds,
+                        AiAnalysisTime = result.Metrics.AiAnalysisTime?.TotalSeconds,
+                        OcrProcessingTime = result.Metrics.OcrProcessingTime?.TotalSeconds
+                    };
+                }
+
+                document.Metadata = JsonSerializer.Serialize(metadata);
+            }
+
+            await documentService.CreateDocumentAsync(document);
+            _logger?.LogInformation("Saved document {FileName} to database with ID {DocumentId}", 
+                document.FileName, document.Id);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to save document {FileName} to database", 
+                result.ProcessedImage.FileName);
+            // Don't throw - this shouldn't break the main processing flow
+        }
+    }
+
+    /// <summary>
+    /// Get content type based on file extension
+    /// </summary>
+    private static string GetContentType(string fileExtension)
+    {
+        return fileExtension?.ToLowerInvariant() switch
+        {
+            ".pdf" => "application/pdf",
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".png" => "image/png",
+            ".bmp" => "image/bmp",
+            ".gif" => "image/gif",
+            ".tif" or ".tiff" => "image/tiff",
+            ".webp" => "image/webp",
+            _ => "application/octet-stream"
+        };
     }
 
     public void Dispose()

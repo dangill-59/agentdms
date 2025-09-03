@@ -48,6 +48,9 @@
                         <button class="nav-link" id="mistral-tab" data-bs-toggle="tab" data-bs-target="#mistral" type="button" role="tab">
                             <i class="bi bi-gear"></i> Mistral Settings
                         </button>
+                        <button class="nav-link" id="documents-tab" data-bs-toggle="tab" data-bs-target="#documents" type="button" role="tab">
+                            <i class="bi bi-search"></i> Document Search
+                        </button>
                         <button class="nav-link" id="output-tab" data-bs-toggle="tab" data-bs-target="#output" type="button" role="tab">
                             <i class="bi bi-hdd"></i> Output Settings
                         </button>
@@ -663,6 +666,97 @@
                                     <!-- Status Messages -->
                                     <div id="mistralStatus" class="mt-3" style="display: none;">
                                         <!-- Success/error messages will be shown here -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Document Search Tab -->
+                <div class="tab-pane fade" id="documents" role="tabpanel">
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="bi bi-search"></i> Document Search & Management</h5>
+                                </div>
+                                <div class="card-body">
+                                    <!-- Search Section -->
+                                    <div class="row mb-4">
+                                        <div class="col-md-8">
+                                            <div class="input-group">
+                                                <input type="text" class="form-control" id="documentSearchInput" 
+                                                       placeholder="Search documents by content, filename, or tags..." 
+                                                       onkeypress="if(event.key==='Enter') searchDocuments()">
+                                                <button class="btn btn-primary" type="button" onclick="searchDocuments()">
+                                                    <i class="bi bi-search"></i> Search
+                                                </button>
+                                            </div>
+                                            <div class="form-text">Search through uploaded documents and their extracted text content</div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <button class="btn btn-outline-secondary w-100" type="button" onclick="loadRecentDocuments()">
+                                                <i class="bi bi-clock-history"></i> Recent Documents
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Document Statistics -->
+                                    <div class="row mb-4">
+                                        <div class="col-12">
+                                            <div class="card bg-light">
+                                                <div class="card-body">
+                                                    <div class="row text-center">
+                                                        <div class="col-md-4">
+                                                            <h5 class="text-primary mb-1" id="totalDocuments">-</h5>
+                                                            <small class="text-muted">Total Documents</small>
+                                                        </div>
+                                                        <div class="col-md-4">
+                                                            <h5 class="text-success mb-1" id="documentsWithOcr">-</h5>
+                                                            <small class="text-muted">With OCR Text</small>
+                                                        </div>
+                                                        <div class="col-md-4">
+                                                            <h5 class="text-info mb-1" id="recentDocumentsCount">-</h5>
+                                                            <small class="text-muted">Recent (24h)</small>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Results Section -->
+                                    <div class="row">
+                                        <div class="col-12">
+                                            <div id="documentSearchResults">
+                                                <div class="text-center text-muted py-4">
+                                                    <i class="bi bi-file-earmark-text" style="font-size: 3rem;"></i>
+                                                    <p class="mt-2">Search for documents or click "Recent Documents" to get started</p>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Pagination -->
+                                            <div id="documentPagination" class="d-none">
+                                                <nav aria-label="Document search pagination">
+                                                    <ul class="pagination justify-content-center">
+                                                        <li class="page-item">
+                                                            <button class="page-link" onclick="changePage('prev')" aria-label="Previous">
+                                                                <span aria-hidden="true">&laquo;</span>
+                                                            </button>
+                                                        </li>
+                                                        <li class="page-item active">
+                                                            <span class="page-link" id="currentPageInfo">Page 1</span>
+                                                        </li>
+                                                        <li class="page-item">
+                                                            <button class="page-link" onclick="changePage('next')" aria-label="Next">
+                                                                <span aria-hidden="true">&raquo;</span>
+                                                            </button>
+                                                        </li>
+                                                    </ul>
+                                                </nav>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

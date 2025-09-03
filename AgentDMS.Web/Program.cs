@@ -1,10 +1,12 @@
 using AgentDMS.Core.Services;
 using AgentDMS.Core.Services.Storage;
 using AgentDMS.Core.Models;
+using AgentDMS.Core.Data;
 using AgentDMS.Web.Hubs;
 using AgentDMS.Web.Services;
 using AgentDMS.Web.Middleware;
 using Microsoft.OpenApi.Models;
+using Microsoft.EntityFrameworkCore;
 using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -52,6 +54,23 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(optio
 // Add services to the container
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+
+// Configure Database
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
+    ?? Path.Combine(Directory.GetCurrentDirectory(), "App_Data", "agentdms.db");
+
+// Ensure the App_Data directory exists
+var dbDirectory = Path.GetDirectoryName(connectionString);
+if (!string.IsNullOrEmpty(dbDirectory) && !Directory.Exists(dbDirectory))
+{
+    Directory.CreateDirectory(dbDirectory);
+}
+
+builder.Services.AddDbContext<AgentDmsContext>(options =>
+    options.UseSqlite($"Data Source={connectionString}"));
+
+// Add Document Service
+builder.Services.AddScoped<IDocumentService, DocumentService>();
 
 // Enhanced Swagger configuration
 builder.Services.AddSwaggerGen(options =>
@@ -237,7 +256,8 @@ builder.Services.AddSingleton<ImageProcessingService>(provider =>
         maxConcurrency: 4, 
         logger: logger, 
         mistralService: mistralService,
-        mistralOcrService: mistralOcrService);
+        mistralOcrService: mistralOcrService,
+        serviceProvider: provider);
 });
 
 // Configure CORS to allow all origins for development (updated for SignalR)
@@ -261,6 +281,21 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+// Initialize database
+using (var scope = app.Services.CreateScope())
+{
+    var context = scope.ServiceProvider.GetRequiredService<AgentDmsContext>();
+    try
+    {
+        await context.Database.EnsureCreatedAsync();
+        app.Logger.LogInformation("Database initialized successfully");
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Error initializing database");
+    }
+}
 
 // Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
